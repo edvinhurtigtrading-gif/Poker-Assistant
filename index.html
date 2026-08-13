@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Poker Assistant v0.2.1</title>
+  <title>Poker Assistant v0.2.2</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -24,6 +24,14 @@
       <section class="table-section">
         <div class="table-wrap">
           <div class="poker-table">
+            <div class="entry-overlay hidden" id="entryOverlay">
+              <div class="entry-panel">
+                <span class="eyebrow" id="entryEyebrow">NEW HAND</span>
+                <h2 id="entryTitle">ENTER YOUR HAND</h2>
+                <p id="entryHint">Välj dina två hålkort för att starta handen.</p>
+                <div class="entry-cards" id="entryCards"></div>
+              </div>
+            </div>
             <div class="felt-inner">
               <div class="board-area">
                 <div class="pot-label">POT</div>
@@ -148,8 +156,8 @@
         </div>
 
         <div class="panel-card coming-soon">
-          <div class="panel-heading"><span class="eyebrow">ENGINE</span><h2>v0.2.1</h2></div>
-          <p>Bettingrundor avslutas automatiskt. Check/Call aktiveras bara när de är lagliga. Flop, turn och river väntar på att du matar in board-korten innan nästa bettingrunda fortsätter.</p>
+          <div class="panel-heading"><span class="eyebrow">FLOW</span><h2>v0.2.2</h2></div>
+          <p>Varje ny hand börjar med en stor ENTER YOUR HAND-vy. När bettingrundan är klar visas automatiskt ENTER FLOP, ENTER TURN eller ENTER RIVER mitt på bordet.</p>
         </div>
       </aside>
     </main>

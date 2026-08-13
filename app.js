@@ -6,7 +6,7 @@ const STORAGE_KEY="poker-assistant-v021";
 let pickerTarget=null,pickerRank=null,pendingAction=null,snapshots=[];
 
 function basePlayers(){return NAMES.map((name,seat)=>({seat,name,stack:100,streetBet:0,folded:false,allIn:false,acted:false}));}
-function defaultState(){return {handNumber:1,dealerSeat:3,street:"preflop",players:basePlayers(),pot:0,currentBet:0,actorSeat:null,heroCards:[null,null],board:[null,null,null,null,null],history:[],awaitingBoard:false,handComplete:false};}
+function defaultState(){return {handNumber:1,dealerSeat:3,street:"preflop",players:basePlayers(),pot:0,currentBet:0,actorSeat:null,heroCards:[null,null],board:[null,null,null,null,null],history:[],awaitingBoard:false,awaitingHeroCards:true,handComplete:false};}
 let state=loadState()||defaultState();
 
 function loadState(){try{const x=JSON.parse(localStorage.getItem(STORAGE_KEY));return x&&x.players?.length===6?x:null}catch{return null}}
@@ -31,10 +31,10 @@ function postBlind(seat,amount,label){
 function startHand(resetStacks=false){
   if(resetStacks)state.players=basePlayers();
   state.street="preflop";state.pot=0;state.currentBet=0;state.heroCards=[null,null];state.board=[null,null,null,null,null];
-  state.history=[];state.awaitingBoard=false;state.handComplete=false;
+  state.history=[];state.awaitingBoard=false;state.awaitingHeroCards=true;state.handComplete=false;
   state.players.forEach(p=>{p.streetBet=0;p.folded=false;p.allIn=false;p.acted=false});
   postBlind(seatForPos("SB"),.5,"SB");postBlind(seatForPos("BB"),1,"BB");
-  state.currentBet=1;state.actorSeat=seatForPos("UTG");
+  state.currentBet=1;state.actorSeat=null;
   state.history.push({street:"preflop",text:"Hand started"});
   snapshots=[];pendingAction=null;render();
 }
@@ -87,7 +87,7 @@ function advanceAfterAction(lastSeat){
 }
 
 function doAction(type,overrideSize=null){
-  if(state.handComplete||state.awaitingBoard||state.actorSeat===null)return;
+  if(state.handComplete||state.awaitingBoard||state.awaitingHeroCards||state.actorSeat===null)return;
   const s=state.actorSeat,p=state.players[s],name=NAMES[s],toCall=amountToCallFor(s);
   if(type==="check"&&toCall>0){alert("Check är inte möjligt. Du måste folda, syna eller höja.");return}
   if(type==="call"&&toCall<=0){alert("Det finns inget att syna. Check är gratis.");return}
@@ -151,12 +151,12 @@ function buildPicker(){
   RANKS.forEach(r=>{const b=document.createElement("button");b.textContent=r;b.onclick=()=>{pickerRank=r;rg.classList.add("hidden");sg.classList.remove("hidden")};rg.appendChild(b)});
   SUITS.forEach(su=>{const b=document.createElement("button");b.textContent=su.sym;b.style.color=su.red?"#e34b4b":"#111";b.onclick=()=>{
     const code=pickerRank+su.k,old=targetGet();if(usedCards().includes(code)&&(!old||old.rank+old.suit!==code)){alert("Kortet används redan.");return}
-    snapshot();targetSet({rank:pickerRank,suit:su.k});closePicker();resumeStreetIfBoardReady();render();
+    snapshot();targetSet({rank:pickerRank,suit:su.k});closePicker();if(state.awaitingHeroCards&&state.heroCards.every(Boolean)){state.awaitingHeroCards=false;state.actorSeat=seatForPos("UTG");state.history.push({street:"preflop",text:"Hero cards entered — preflop betting begins"});}resumeStreetIfBoardReady();render();
   };sg.appendChild(b)});
 }
 function setButtonState(){
   const toCall=state.actorSeat===null?0:amountToCallFor(state.actorSeat);
-  const locked=state.actorSeat===null||state.awaitingBoard||state.handComplete;
+  const locked=state.actorSeat===null||state.awaitingBoard||state.awaitingHeroCards||state.handComplete;
   document.querySelectorAll("[data-action]").forEach(b=>b.disabled=locked);
   const check=document.querySelector('[data-action="check"]'),call=document.querySelector('[data-action="call"]');
   const bet=document.querySelector('[data-action="bet"]'),raise=document.querySelector('[data-action="raise"]');
@@ -195,7 +195,34 @@ function render(){
   for(let s=0;s<6;s++){const row=document.createElement("div");row.className=`position-row ${s===0?"hero":""}`;row.innerHTML=`<span>${NAMES[s]}</span><strong>${posForSeat(s)}</strong>`;list.appendChild(row)}
   const hist=document.getElementById("history");hist.innerHTML="";let lastStreet="";
   state.history.forEach(h=>{if(h.street!==lastStreet){const st=document.createElement("div");st.className="history-street";st.textContent=h.street.toUpperCase();hist.appendChild(st);lastStreet=h.street}const ln=document.createElement("div");ln.className="history-line";ln.textContent=h.text;hist.appendChild(ln)});
-  setButtonState();saveState();
+  setButtonState();
+  const overlay=document.getElementById("entryOverlay"), entryCards=document.getElementById("entryCards");
+  const showEntry=state.awaitingHeroCards||state.awaitingBoard;
+  overlay.classList.toggle("hidden",!showEntry);
+  if(showEntry){
+    entryCards.innerHTML="";
+    if(state.awaitingHeroCards){
+      document.getElementById("entryEyebrow").textContent="NEW HAND";
+      document.getElementById("entryTitle").textContent="ENTER YOUR HAND";
+      document.getElementById("entryHint").textContent="Välj dina två hålkort. Preflop startar automatiskt när båda är valda.";
+      [0,1].forEach(i=>{
+        const b=document.createElement("button");b.className="entry-card";const c=state.heroCards[i];b.textContent=cardText(c);
+        if(c){b.classList.add("filled",SUITS.find(s=>s.k===c.suit).red?"card-red":"card-black")}
+        b.onclick=()=>openPicker(`hero${i}`);entryCards.appendChild(b);
+      });
+    }else{
+      const need=state.street==="flop"?[0,1,2]:state.street==="turn"?[3]:[4];
+      document.getElementById("entryEyebrow").textContent=state.street.toUpperCase();
+      document.getElementById("entryTitle").textContent=`ENTER ${state.street.toUpperCase()}`;
+      document.getElementById("entryHint").textContent=state.street==="flop"?"Välj de tre flopkorten. Action startar automatiskt när alla tre är valda.":"Välj det nya boardkortet. Action startar automatiskt när kortet är valt.";
+      need.forEach(i=>{
+        const b=document.createElement("button");b.className="entry-card";const c=state.board[i];b.textContent=cardText(c);
+        if(c){b.classList.add("filled",SUITS.find(s=>s.k===c.suit).red?"card-red":"card-black")}
+        b.onclick=()=>openPicker(`board${i}`);entryCards.appendChild(b);
+      });
+    }
+  }
+  saveState();
 }
 
 document.querySelectorAll("[data-card-slot]").forEach(b=>b.addEventListener("click",()=>openPicker(b.dataset.cardSlot)));
