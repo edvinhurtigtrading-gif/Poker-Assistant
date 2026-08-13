@@ -221,6 +221,28 @@ function renderMathPanel(){
   }
 }
 
+
+const HR={2:2,3:3,4:4,5:5,6:6,7:7,8:8,9:9,T:10,J:11,Q:12,K:13,A:14};
+const FULLDECK=RANKS.flatMap(r=>SUITS.map(s=>({rank:r,suit:s.k})));
+function code(c){return c.rank+c.suit} function copy(c){return {rank:c.rank,suit:c.suit}}
+function shuf(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function comb(arr,k){const out=[];function rec(s,p){if(p.length===k){out.push(p.slice());return}for(let i=s;i<=arr.length-(k-p.length);i++){p.push(arr[i]);rec(i+1,p);p.pop()}}rec(0,[]);return out}
+function e5(cs){const v=cs.map(c=>HR[c.rank]).sort((a,b)=>b-a),cnt={};v.forEach(x=>cnt[x]=(cnt[x]||0)+1);let u=[...new Set(v)].sort((a,b)=>b-a);if(u.includes(14))u.push(1);let st=0;for(let i=0;i<=u.length-5;i++)if(u[i]-u[i+4]===4){st=u[i];break}const fl=cs.every(c=>c.suit===cs[0].suit),g=Object.entries(cnt).map(([x,n])=>({v:+x,c:n})).sort((a,b)=>b.c-a.c||b.v-a.v);if(fl&&st)return[8,st];if(g[0].c===4)return[7,g[0].v,g[1].v];if(g[0].c===3&&g[1]?.c===2)return[6,g[0].v,g[1].v];if(fl)return[5,...v];if(st)return[4,st];if(g[0].c===3)return[3,g[0].v,...g.slice(1).map(x=>x.v).sort((a,b)=>b-a)];if(g[0].c===2&&g[1]?.c===2){const p=[g[0].v,g[1].v].sort((a,b)=>b-a),k=g.find(x=>x.c===1).v;return[2,...p,k]}if(g[0].c===2)return[1,g[0].v,...g.filter(x=>x.c===1).map(x=>x.v).sort((a,b)=>b-a)];return[0,...v]}
+function cmp(a,b){for(let i=0;i<Math.max(a.length,b.length);i++){const x=a[i]||0,y=b[i]||0;if(x!==y)return x>y?1:-1}return 0}
+function best(cs){let b=null;for(const f of comb(cs,5)){const s=e5(f);if(!b||cmp(s,b)>0)b=s}return b}
+function desc(a,b){const x=HR[a.rank],y=HR[b.rank];if(x===y)return a.rank+b.rank;const hi=x>y?a:b,lo=x>y?b:a;return hi.rank+lo.rank+(a.suit===b.suit?"s":"o")}
+const ORDER=["AA","KK","QQ","JJ","TT","99","88","77","66","55","44","33","22","AKs","AQs","AJs","ATs","KQs","KJs","QJs","JTs","T9s","98s","87s","76s","65s","54s","AKo","AQo","AJo","KQo","ATo","KJo","QJo","A9s","A8s","A7s","A6s","A5s","A4s","A3s","A2s","KTs","QTs","J9s","T8s","97s","86s","75s","64s","53s","43s","K9s","Q9s","J8s","T7s","96s","85s","74s","63s","52s","42s","A9o","A8o","A7o","A6o","A5o","KTo","QTo","JTo","K9o","Q9o","J9o","T9o","98o","87o","76o","65o","54o"];
+function preset(kind,seat){let t=kind==="tight"?12:kind==="standard"?20:kind==="wide"?35:kind==="verywide"?50:({UTG:14,HJ:18,CO:27,BTN:43,SB:36,BB:45}[posForSeat(seat)]||20);let c=0,ds=new Set;const goal=1326*t/100;for(const d of ORDER){if(c>=goal)break;ds.add(d);c+=d.length===2?6:d.endsWith("s")?4:12}return{ds,t}}
+function villainSeat(){const e=document.getElementById("villainSelect");return e&&e.value!==""?+e.value:null}
+function rangeNow(){const s=villainSeat();if(s===null)return{combos:[],t:0};const p=preset(document.getElementById("rangePreset")?.value||"auto",s),dead=new Set([...state.heroCards,...state.board].filter(Boolean).map(code)),av=FULLDECK.filter(c=>!dead.has(code(c))),out=[];for(let i=0;i<av.length;i++)for(let j=i+1;j<av.length;j++)if(p.ds.has(desc(av[i],av[j])))out.push([copy(av[i]),copy(av[j])]);return{combos:out,t:p.t}}
+function updateVillains(){const e=document.getElementById("villainSelect");if(!e)return;const old=e.value;e.innerHTML="";state.players.forEach((p,i)=>{if(i===0||p.folded)return;const o=document.createElement("option");o.value=i;o.textContent=`${NAMES[i]} · ${posForSeat(i)}`;e.appendChild(o)});if([...e.options].some(o=>o.value===old))e.value=old}
+function rangeSummary(){const r=rangeNow();const a=document.getElementById("rangeCombos"),b=document.getElementById("rangeWidth");if(a){a.textContent=r.combos.length;b.textContent=`≈ ${r.t}%`}}
+let lastEq=null;
+function runEq(){if(!state.heroCards.every(Boolean)){alert("Välj Hero-korten först.");return}const r=rangeNow();if(!r.combos.length)return;const btn=document.getElementById("runEquityBtn");btn.disabled=true;btn.textContent="Calculating...";setTimeout(()=>{let w=0,t=0,l=0,N=10000;const kb=state.board.filter(Boolean).map(copy),base=new Set([...state.heroCards,...kb].map(code));for(let n=0;n<N;n++){const vh=r.combos[Math.floor(Math.random()*r.combos.length)];if(vh.some(c=>base.has(code(c)))){n--;continue}const dead=new Set([...base,...vh.map(code)]),d=shuf(FULLDECK.filter(c=>!dead.has(code(c))).map(copy)),bd=kb.slice();while(bd.length<5)bd.push(d.pop());const q=cmp(best([...state.heroCards,...bd]),best([...vh,...bd]));q>0?w++:q===0?t++:l++}lastEq={win:w/N,tie:t/N,lose:l/N,equity:(w+t*.5)/N};renderEq();btn.disabled=false;btn.textContent="Calculate equity"},10)}
+function renderEq(){if(!lastEq)return;document.getElementById("eqWin").textContent=pct(lastEq.win);document.getElementById("eqTie").textContent=pct(lastEq.tie);document.getElementById("eqLose").textContent=pct(lastEq.lose);document.getElementById("eqTotal").textContent=pct(lastEq.equity);document.getElementById("equityExplanation").innerHTML=`Hero equity vs selected estimated range: <strong class="math-highlight">${pct(lastEq.equity)}</strong>. Blocked combos are removed.`;renderEv()}
+function renderEv(){if(!lastEq)return;const eq=lastEq.equity,call=heroIsActing()?amountToCallFor(0):0,pot=state.pot,evCall=call>0?eq*(pot+call)-call:0,fp=+document.getElementById("foldSlider").value/100,frac=+document.getElementById("raiseSizeSelect").value,cost=Math.min(state.players[0].stack,pot*frac),calledPot=pot+2*cost,evCalled=eq*calledPot-cost,evRaise=fp*pot+(1-fp)*evCalled;document.getElementById("evCall").textContent=`${evCall.toFixed(2)} BB`;document.getElementById("evRaise").textContent=`${evRaise.toFixed(2)} BB`;const v=[["FOLD",0],["CALL",evCall],["RAISE",evRaise]].sort((a,b)=>b[1]-a[1]),gap=v[0][1]-v[1][1],s=gap>=2?"CLEAR":gap>=.5?"MODERATE":"CLOSE";document.getElementById("recommendation").innerHTML=`BEST: <span class="math-highlight">${v[0][0]}</span> · EV ${v[0][1].toFixed(2)} BB · ${s}`}
+function hookV04(){const vs=document.getElementById("villainSelect"),rp=document.getElementById("rangePreset");if(!vs)return;vs.onchange=()=>{lastEq=null;rangeSummary()};rp.onchange=()=>{lastEq=null;rangeSummary()};document.getElementById("runEquityBtn").onclick=runEq;const f=document.getElementById("foldSlider");f.oninput=()=>{document.getElementById("foldValue").textContent=`${f.value}%`;renderEv()};document.getElementById("raiseSizeSelect").onchange=renderEv;updateVillains();rangeSummary()}
+
 function render(){
   document.getElementById("handNumber").textContent=`#${state.handNumber}`;
   document.getElementById("streetLabel").textContent=streetName(state.street);
@@ -293,5 +315,5 @@ document.getElementById("undoBtn").onclick=undo;
 document.getElementById("nextStreetBtn").style.display="none";
 document.getElementById("nextHand").onclick=nextHand;
 document.getElementById("resetSession").onclick=()=>{if(confirm("Reset hela sessionen?"))resetAll()};
-buildPicker();
+buildPicker();hookV04();
 if(!state.history?.length)startHand(false);else render();

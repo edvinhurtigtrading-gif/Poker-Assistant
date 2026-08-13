@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Poker Assistant v0.3</title>
+  <title>Poker Assistant v0.4</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -194,10 +194,35 @@
           </div>
         </div>
 
-        <div class="panel-card coming-soon">
-          <div class="panel-heading"><span class="eyebrow">NEXT</span><h2>v0.4</h2></div>
-          <p>Equity mot ranges, combos/blockers och första EV-jämförelsen mellan Fold, Call och Raise.</p>
+        <div class="panel-card">
+          <div class="panel-heading"><span class="eyebrow">ESTIMATED RANGE</span><h2>Opponent Model</h2></div>
+          <label class="field-label">Villain</label><select id="villainSelect" class="select-input"></select>
+          <label class="field-label">Range preset</label>
+          <select id="rangePreset" class="select-input">
+            <option value="auto">Auto by position</option><option value="tight">Tight ≈ 12%</option>
+            <option value="standard">Standard ≈ 20%</option><option value="wide">Wide ≈ 35%</option>
+            <option value="verywide">Very wide ≈ 50%</option>
+          </select>
+          <div class="range-summary"><div><span>Estimated combos</span><strong id="rangeCombos">—</strong></div><div><span>Range width</span><strong id="rangeWidth">—</strong></div></div>
+          <button id="runEquityBtn" class="primary-btn full">Calculate equity</button>
+          <div class="sim-note">Monte Carlo 10,000 runs</div>
         </div>
+        <div class="panel-card">
+          <div class="panel-heading"><span class="eyebrow">EQUITY</span><h2>Hero vs Range</h2></div>
+          <div class="math-grid"><div class="math-stat"><span>Win</span><strong id="eqWin">—</strong></div><div class="math-stat"><span>Tie</span><strong id="eqTie">—</strong></div><div class="math-stat"><span>Lose</span><strong id="eqLose">—</strong></div><div class="math-stat"><span>Equity</span><strong id="eqTotal">—</strong></div></div>
+          <div class="math-explanation" id="equityExplanation">Välj villain och kör equity.</div>
+        </div>
+        <div class="panel-card">
+          <div class="panel-heading"><span class="eyebrow">EV MODEL</span><h2>Decision Comparison</h2></div>
+          <label class="field-label">Estimated fold to raise</label>
+          <div class="slider-row"><input id="foldSlider" type="range" min="0" max="100" value="35"><strong id="foldValue">35%</strong></div>
+          <label class="field-label">Raise size</label>
+          <select id="raiseSizeSelect" class="select-input"><option value="0.5">50% pot</option><option value="0.75">75% pot</option><option value="1">100% pot</option></select>
+          <div class="ev-table"><div><span>Fold</span><strong id="evFold">0.00 BB</strong></div><div><span>Call</span><strong id="evCall">—</strong></div><div><span>Raise</span><strong id="evRaise">—</strong></div></div>
+          <div class="recommendation" id="recommendation">Run equity to compare decisions.</div>
+          <div class="model-warning">Raise EV uses estimated fold frequency and a simplified call model. Not GTO.</div>
+        </div>
+        <div class="panel-card coming-soon"><div class="panel-heading"><span class="eyebrow">NEXT</span><h2>v0.5</h2></div><p>Action-based range narrowing, weighted ranges and sensitivity analysis.</p></div>
       </aside>
     </main>
   </div>

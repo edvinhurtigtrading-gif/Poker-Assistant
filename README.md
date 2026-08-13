@@ -1,35 +1,14 @@
-# Poker Assistant v0.3
+# Poker Assistant v0.4
 
-v0.3 lägger till den första riktiga matematikmotorn ovanpå v0.2.2.
+Adds:
+- Hero equity vs estimated opponent range
+- Position-based range presets
+- Card-combination generation
+- Hero/board blocker removal
+- 10,000-run Monte Carlo
+- Fold / Call / simplified Raise EV
+- CLEAR / MODERATE / CLOSE decision strength
 
-## Nytt i v0.3
-- Pot before action
-- Amount to call
-- Pot odds
-- Required equity
-- Effective stack
-- SPR
-- Automatisk matematisk förklaring när Hero står på tur
-- Matematikpanelen uppdateras automatiskt från bordets Game State
+Important: ranges and fold frequencies are estimates. Raise EV is simplified. This is not a GTO solver.
 
-## Formler
-
-### Required equity / pot odds för call
-Required Equity = Call Amount / Final Pot After Call
-
-Exempel:
-Pot före call: 20 BB
-Call: 5 BB
-Final pot efter call: 25 BB
-Required equity: 5 / 25 = 20%
-
-### SPR
-SPR = Effective Stack / Pot
-
-SPR visas postflop.
-
-## Viktigt
-v0.3 gör ännu ingen equity-estimering mot opponent ranges och rekommenderar därför ännu inte Fold/Call/Raise baserat på full EV.
-
-Nästa steg:
-v0.4 — equity mot ranges, combos/blockers och EV-jämförelse.
+Next: action-based range narrowing, weighted ranges and sensitivity analysis.
