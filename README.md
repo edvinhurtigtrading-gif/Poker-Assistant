@@ -1,21 +1,19 @@
-# Poker Assistant v0.2
+# Poker Assistant v0.2.1
 
-Webbaserat 6-max pokerbord för manuell handanalys.
+Stabiliserad spelmotor ovanpå v0.2.
 
-## Nytt i v0.2
-- Hero-kort med klickbar kortväljare
-- Flop / turn / river-kort med samma väljare
-- Automatiska SB / BB
-- Stack tracking
-- Pot tracking
-- Fold / Check / Call / Bet / Raise / All-in
-- Snabba bet sizes
-- Hand history
-- Undo
-- Next street
-- Next hand + automatisk positionsrotation
-- Lokal lagring i webbläsaren
+## Förbättrat
+- Bettingrundor avslutas automatiskt när alla aktiva spelare har agerat och matchat aktuell bet.
+- Automatisk övergång preflop → flop → turn → river.
+- Board-kort låses tills rätt street.
+- Nästa bettingrunda startar först när rätt board-kort matats in.
+- Check är avstängd när spelaren måste syna.
+- Call är avstängd när det inte finns något att syna.
+- Bet och Raise visas bara som lagliga alternativ för rätt state.
+- Fold och all-in hanteras i action order.
+- Fold-win avslutar handen automatiskt.
+- Undo finns kvar.
+- Dealer/positioner roterar automatiskt mellan händer.
 
-## Viktigt
-Det här är ännu inte en solver. v0.3 lägger till grundläggande matematik:
-pot odds, required equity och SPR.
+## Nästa steg
+v0.3: Poker Math Engine — pot odds, required equity, SPR och första matematiska beslutsstödet.
