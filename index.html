@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Poker Assistant v0.1</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">POKER ASSISTANT</div>
+        <h1>6-Max Table State</h1>
+      </div>
+      <div class="hand-meta">
+        <div class="meta-card"><span>Hand</span><strong id="handNumber">#1</strong></div>
+        <div class="meta-card"><span>Hero position</span><strong id="heroPosition">UTG</strong></div>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="table-section">
+        <div class="table-wrap">
+          <div class="poker-table">
+            <div class="felt-inner">
+              <div class="center-status">
+                <span class="status-label">CURRENT HAND</span>
+                <strong id="centerHeroPosition">Hero · UTG</strong>
+                <span id="dealerInfo">Dealer: Player 4</span>
+              </div>
+            </div>
+
+            <div class="seat seat-0 hero-seat">
+              <div class="seat-card">
+                <div class="seat-topline"><span class="player-name">HERO</span><span class="position-badge" id="position-0">UTG</span></div>
+                <div class="stack">100 BB</div>
+              </div>
+              <div class="dealer-button" id="dealer-0">D</div>
+            </div>
+
+            <div class="seat seat-1">
+              <div class="seat-card">
+                <div class="seat-topline"><span class="player-name">Player 2</span><span class="position-badge" id="position-1">HJ</span></div>
+                <div class="stack">100 BB</div>
+              </div>
+              <div class="dealer-button" id="dealer-1">D</div>
+            </div>
+
+            <div class="seat seat-2">
+              <div class="seat-card">
+                <div class="seat-topline"><span class="player-name">Player 3</span><span class="position-badge" id="position-2">CO</span></div>
+                <div class="stack">100 BB</div>
+              </div>
+              <div class="dealer-button" id="dealer-2">D</div>
+            </div>
+
+            <div class="seat seat-3">
+              <div class="seat-card">
+                <div class="seat-topline"><span class="player-name">Player 4</span><span class="position-badge" id="position-3">BTN</span></div>
+                <div class="stack">100 BB</div>
+              </div>
+              <div class="dealer-button" id="dealer-3">D</div>
+            </div>
+
+            <div class="seat seat-4">
+              <div class="seat-card">
+                <div class="seat-topline"><span class="player-name">Player 5</span><span class="position-badge" id="position-4">SB</span></div>
+                <div class="stack">100 BB</div>
+              </div>
+              <div class="dealer-button" id="dealer-4">D</div>
+            </div>
+
+            <div class="seat seat-5">
+              <div class="seat-card">
+                <div class="seat-topline"><span class="player-name">Player 6</span><span class="position-badge" id="position-5">BB</span></div>
+                <div class="stack">100 BB</div>
+              </div>
+              <div class="dealer-button" id="dealer-5">D</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="controls">
+          <button id="prevHand" class="secondary-btn">← Previous hand</button>
+          <button id="nextHand" class="primary-btn">Next hand →</button>
+          <button id="resetSession" class="ghost-btn">Reset</button>
+        </div>
+      </section>
+
+      <aside class="side-panel">
+        <div class="panel-card">
+          <div class="panel-heading"><span class="eyebrow">TABLE LOGIC</span><h2>Positions</h2></div>
+          <div class="position-list" id="positionList"></div>
+        </div>
+
+        <div class="panel-card">
+          <div class="panel-heading"><span class="eyebrow">V0.1</span><h2>Vad fungerar nu?</h2></div>
+          <ul class="feature-list">
+            <li>Hero sitter alltid visuellt längst ned.</li>
+            <li>Dealer-knappen roterar ett steg per hand.</li>
+            <li>BTN, SB, BB, UTG, HJ och CO räknas om automatiskt.</li>
+            <li>Hero-positionen uppdateras automatiskt.</li>
+            <li>Sessionen sparas lokalt i webbläsaren.</li>
+          </ul>
+        </div>
+
+        <div class="panel-card coming-soon">
+          <div class="panel-heading"><span class="eyebrow">NEXT</span><h2>v0.2</h2></div>
+          <p>Kortväljare, blinds, pot, stackar och snabbknappar för Fold / Check / Call / Bet / Raise / All-in.</p>
+        </div>
+      </aside>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
