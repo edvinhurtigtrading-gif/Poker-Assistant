@@ -238,10 +238,105 @@ function rangeNow(){const s=villainSeat();if(s===null)return{combos:[],t:0};cons
 function updateVillains(){const e=document.getElementById("villainSelect");if(!e)return;const old=e.value;e.innerHTML="";state.players.forEach((p,i)=>{if(i===0||p.folded)return;const o=document.createElement("option");o.value=i;o.textContent=`${NAMES[i]} · ${posForSeat(i)}`;e.appendChild(o)});if([...e.options].some(o=>o.value===old))e.value=old}
 function rangeSummary(){const r=rangeNow();const a=document.getElementById("rangeCombos"),b=document.getElementById("rangeWidth");if(a){a.textContent=r.combos.length;b.textContent=`≈ ${r.t}%`}}
 let lastEq=null;
-function runEq(){if(!state.heroCards.every(Boolean)){alert("Välj Hero-korten först.");return}const r=rangeNow();if(!r.combos.length)return;const btn=document.getElementById("runEquityBtn");btn.disabled=true;btn.textContent="Calculating...";setTimeout(()=>{let w=0,t=0,l=0,N=10000;const kb=state.board.filter(Boolean).map(copy),base=new Set([...state.heroCards,...kb].map(code));for(let n=0;n<N;n++){const vh=r.combos[Math.floor(Math.random()*r.combos.length)];if(vh.some(c=>base.has(code(c)))){n--;continue}const dead=new Set([...base,...vh.map(code)]),d=shuf(FULLDECK.filter(c=>!dead.has(code(c))).map(copy)),bd=kb.slice();while(bd.length<5)bd.push(d.pop());const q=cmp(best([...state.heroCards,...bd]),best([...vh,...bd]));q>0?w++:q===0?t++:l++}lastEq={win:w/N,tie:t/N,lose:l/N,equity:(w+t*.5)/N};renderEq();btn.disabled=false;btn.textContent="Calculate equity"},10)}
+function runEq(autoMode=false){
+  if(!state.heroCards.every(Boolean)){if(!autoMode)alert("Välj Hero-korten först.");return}
+  const r=rangeNow();if(!r.combos.length)return;
+  const btn=document.getElementById("runEquityBtn");
+  if(btn&&!autoMode){btn.disabled=true;btn.textContent="Calculating..."}
+  const token=++autoAnalysisToken;
+  if(autoMode)autoAnalysisRunning=true;
+  setTimeout(()=>{
+    let w=0,t=0,l=0,N=10000;
+    const kb=state.board.filter(Boolean).map(copy),base=new Set([...state.heroCards,...kb].map(code));
+    for(let n=0;n<N;n++){
+      if(token!==autoAnalysisToken)return;
+      const vh=r.combos[Math.floor(Math.random()*r.combos.length)];
+      if(vh.some(c=>base.has(code(c)))){n--;continue}
+      const dead=new Set([...base,...vh.map(code)]),d=shuf(FULLDECK.filter(c=>!dead.has(code(c))).map(copy)),bd=kb.slice();
+      while(bd.length<5)bd.push(d.pop());
+      const q=cmp(best([...state.heroCards,...bd]),best([...vh,...bd]));
+      q>0?w++:q===0?t++:l++;
+    }
+    lastEq={win:w/N,tie:t/N,lose:l/N,equity:(w+t*.5)/N};
+    autoAnalysisRunning=false;
+    renderEq();
+    if(btn&&!autoMode){btn.disabled=false;btn.textContent="Calculate equity"}
+    renderAutoDecision();
+  },10)
+}
 function renderEq(){if(!lastEq)return;document.getElementById("eqWin").textContent=pct(lastEq.win);document.getElementById("eqTie").textContent=pct(lastEq.tie);document.getElementById("eqLose").textContent=pct(lastEq.lose);document.getElementById("eqTotal").textContent=pct(lastEq.equity);document.getElementById("equityExplanation").innerHTML=`Hero equity vs selected estimated range: <strong class="math-highlight">${pct(lastEq.equity)}</strong>. Blocked combos are removed.`;renderEv()}
-function renderEv(){if(!lastEq)return;const eq=lastEq.equity,call=heroIsActing()?amountToCallFor(0):0,pot=state.pot,evCall=call>0?eq*(pot+call)-call:0,fp=+document.getElementById("foldSlider").value/100,frac=+document.getElementById("raiseSizeSelect").value,cost=Math.min(state.players[0].stack,pot*frac),calledPot=pot+2*cost,evCalled=eq*calledPot-cost,evRaise=fp*pot+(1-fp)*evCalled;document.getElementById("evCall").textContent=`${evCall.toFixed(2)} BB`;document.getElementById("evRaise").textContent=`${evRaise.toFixed(2)} BB`;const v=[["FOLD",0],["CALL",evCall],["RAISE",evRaise]].sort((a,b)=>b[1]-a[1]),gap=v[0][1]-v[1][1],s=gap>=2?"CLEAR":gap>=.5?"MODERATE":"CLOSE";document.getElementById("recommendation").innerHTML=`BEST: <span class="math-highlight">${v[0][0]}</span> · EV ${v[0][1].toFixed(2)} BB · ${s}`}
-function hookV04(){const vs=document.getElementById("villainSelect"),rp=document.getElementById("rangePreset");if(!vs)return;vs.onchange=()=>{lastEq=null;rangeSummary()};rp.onchange=()=>{lastEq=null;rangeSummary()};document.getElementById("runEquityBtn").onclick=runEq;const f=document.getElementById("foldSlider");f.oninput=()=>{document.getElementById("foldValue").textContent=`${f.value}%`;renderEv()};document.getElementById("raiseSizeSelect").onchange=renderEv;updateVillains();rangeSummary()}
+function renderEv(){if(!lastEq)return;const eq=lastEq.equity,call=heroIsActing()?amountToCallFor(0):0,pot=state.pot,evCall=call>0?eq*(pot+call)-call:0,fp=+document.getElementById("foldSlider").value/100,frac=+document.getElementById("raiseSizeSelect").value,cost=Math.min(state.players[0].stack,pot*frac),calledPot=pot+2*cost,evCalled=eq*calledPot-cost,evRaise=fp*pot+(1-fp)*evCalled;document.getElementById("evCall").textContent=`${evCall.toFixed(2)} BB`;document.getElementById("evRaise").textContent=`${evRaise.toFixed(2)} BB`;const v=[["FOLD",0],["CALL",evCall],["RAISE",evRaise]].sort((a,b)=>b[1]-a[1]),gap=v[0][1]-v[1][1],s=gap>=2?"CLEAR":gap>=.5?"MODERATE":"CLOSE";document.getElementById("recommendation").innerHTML=`BEST: <span class="math-highlight">${v[0][0]}</span> · EV ${v[0][1].toFixed(2)} BB · ${s}`;renderAutoDecision()}
+
+function autoSignature(){
+  if(!heroIsActing())return "";
+  const villain=villainSeat();
+  return JSON.stringify({
+    hand:state.handNumber,street:state.street,actor:state.actorSeat,pot:state.pot,
+    currentBet:state.currentBet,heroBet:state.players[0].streetBet,
+    hero:state.heroCards,board:state.board,villain,
+    preset:document.getElementById("rangePreset")?.value,
+    fold:document.getElementById("foldSlider")?.value,
+    raise:document.getElementById("raiseSizeSelect")?.value,
+    history:state.history.length
+  })
+}
+function actionEVs(){
+  if(!lastEq)return null;
+  const eq=lastEq.equity,call=heroIsActing()?amountToCallFor(0):0,pot=state.pot;
+  const evFold=0;
+  const evCall=call>0?eq*(pot+call)-call:0;
+  const foldPct=+document.getElementById("foldSlider").value/100;
+  const frac=+document.getElementById("raiseSizeSelect").value;
+  const cost=Math.min(state.players[0].stack,pot*frac);
+  const calledPot=pot+2*cost;
+  const evCalled=eq*calledPot-cost;
+  const evRaise=foldPct*pot+(1-foldPct)*evCalled;
+  return {evFold,evCall,evRaise}
+}
+function renderAutoDecision(){
+  const banner=document.getElementById("heroTurnBanner"),card=document.getElementById("autoDecisionCard");
+  const heroTurn=heroIsActing();
+  banner.classList.toggle("hidden",!heroTurn);
+  card.classList.toggle("hidden",!heroTurn);
+  document.querySelector(".hero-seat")?.classList.toggle("hero-turn",heroTurn);
+  if(!heroTurn)return;
+
+  document.getElementById("heroTurnSub").textContent=autoAnalysisRunning?"Analyzing automatically…":"Decision ready";
+  const req=calculateMath().requiredEquity;
+  document.getElementById("autoReq").textContent=pct(req);
+
+  if(autoAnalysisRunning||!lastEq){
+    document.getElementById("autoDecisionAction").textContent="ANALYZING…";
+    document.getElementById("autoEq").textContent="—";
+    document.getElementById("autoEv").textContent="—";
+    document.getElementById("autoStrength").textContent="—";
+    document.getElementById("autoAlternatives").textContent="Equity, pot odds and EV are being calculated automatically.";
+    return;
+  }
+
+  const ev=actionEVs(); if(!ev)return;
+  const rows=[["FOLD",ev.evFold],["CALL",ev.evCall],["RAISE",ev.evRaise]].sort((a,b)=>b[1]-a[1]);
+  const gap=rows[0][1]-rows[1][1];
+  const strength=gap>=2?"CLEAR":gap>=.5?"MODERATE":"CLOSE";
+  document.getElementById("autoDecisionAction").textContent=rows[0][0];
+  document.getElementById("autoEq").textContent=pct(lastEq.equity);
+  document.getElementById("autoEv").textContent=`${rows[0][1].toFixed(2)} BB`;
+  document.getElementById("autoStrength").textContent=strength;
+  document.getElementById("autoAlternatives").textContent=
+    rows.map(([a,v])=>`${a}: ${v.toFixed(2)} BB`).join("  ·  ");
+}
+function maybeAutoAnalyze(){
+  renderAutoDecision();
+  if(!heroIsActing())return;
+  const sig=autoSignature();
+  if(!sig||sig===lastAutoSignature||autoAnalysisRunning)return;
+  lastAutoSignature=sig;
+  lastEq=null;
+  renderAutoDecision();
+  runEq(true);
+}
+
+function hookV04(){const vs=document.getElementById("villainSelect"),rp=document.getElementById("rangePreset");if(!vs)return;vs.onchange=()=>{lastEq=null;lastAutoSignature="";rangeSummary();maybeAutoAnalyze()};rp.onchange=()=>{lastEq=null;lastAutoSignature="";rangeSummary();maybeAutoAnalyze()};document.getElementById("runEquityBtn").onclick=runEq;const f=document.getElementById("foldSlider");f.oninput=()=>{document.getElementById("foldValue").textContent=`${f.value}%`;lastAutoSignature="";renderEv();maybeAutoAnalyze()};document.getElementById("raiseSizeSelect").onchange=()=>{lastAutoSignature="";renderEv();maybeAutoAnalyze()};updateVillains();rangeSummary()}
 
 function render(){
   document.getElementById("handNumber").textContent=`#${state.handNumber}`;
@@ -301,7 +396,7 @@ function render(){
       });
     }
   }
-  saveState();
+  saveState();setTimeout(maybeAutoAnalyze,0);
 }
 
 document.querySelectorAll("[data-card-slot]").forEach(b=>b.addEventListener("click",()=>openPicker(b.dataset.cardSlot)));

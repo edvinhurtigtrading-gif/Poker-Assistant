@@ -1,14 +1,26 @@
-# Poker Assistant v0.4
+# Poker Assistant v0.4.1 — Auto Decision Mode
 
-Adds:
-- Hero equity vs estimated opponent range
-- Position-based range presets
-- Card-combination generation
-- Hero/board blocker removal
-- 10,000-run Monte Carlo
-- Fold / Call / simplified Raise EV
-- CLEAR / MODERATE / CLOSE decision strength
+## New
+- YOUR TURN banner whenever Hero is the active player.
+- Hero seat glows strongly when it is Hero's turn.
+- Equity calculation starts automatically.
+- EV comparison starts automatically.
+- A large recommendation card appears automatically.
+- Recommendation shows:
+  - Best action
+  - Equity
+  - Required equity
+  - Estimated EV
+  - CLEAR / MODERATE / CLOSE
+  - Alternative EV values
 
-Important: ranges and fold frequencies are estimates. Raise EV is simplified. This is not a GTO solver.
+## Important
+The automatic recommendation uses the v0.4 model:
+- estimated opponent range,
+- estimated fold-to-raise frequency,
+- simplified raise EV model.
 
-Next: action-based range narrowing, weighted ranges and sensitivity analysis.
+It is not a GTO solution yet.
+
+Next:
+Action-based range narrowing, weighted ranges and sensitivity analysis.
