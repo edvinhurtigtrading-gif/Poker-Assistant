@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Poker Assistant v0.2.2</title>
+  <title>Poker Assistant v0.3</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -155,9 +155,48 @@
           <div class="history" id="history"></div>
         </div>
 
+        <div class="panel-card math-panel">
+          <div class="panel-heading"><span class="eyebrow">POKER MATH</span><h2>Decision Math</h2></div>
+
+          <div class="math-hero-note" id="mathHeroNote">
+            Matematikpanelen aktiveras när Hero står på tur.
+          </div>
+
+          <div class="math-grid">
+            <div class="math-stat">
+              <span>Pot before action</span>
+              <strong id="mathPot">—</strong>
+            </div>
+            <div class="math-stat">
+              <span>Amount to call</span>
+              <strong id="mathCall">—</strong>
+            </div>
+            <div class="math-stat">
+              <span>Pot odds</span>
+              <strong id="mathPotOdds">—</strong>
+            </div>
+            <div class="math-stat">
+              <span>Required equity</span>
+              <strong id="mathRequiredEquity">—</strong>
+            </div>
+            <div class="math-stat">
+              <span>Effective stack</span>
+              <strong id="mathEffectiveStack">—</strong>
+            </div>
+            <div class="math-stat">
+              <span>SPR</span>
+              <strong id="mathSpr">—</strong>
+            </div>
+          </div>
+
+          <div class="math-explanation" id="mathExplanation">
+            När Hero står på tur visas här en kort matematisk tolkning.
+          </div>
+        </div>
+
         <div class="panel-card coming-soon">
-          <div class="panel-heading"><span class="eyebrow">FLOW</span><h2>v0.2.2</h2></div>
-          <p>Varje ny hand börjar med en stor ENTER YOUR HAND-vy. När bettingrundan är klar visas automatiskt ENTER FLOP, ENTER TURN eller ENTER RIVER mitt på bordet.</p>
+          <div class="panel-heading"><span class="eyebrow">NEXT</span><h2>v0.4</h2></div>
+          <p>Equity mot ranges, combos/blockers och första EV-jämförelsen mellan Fold, Call och Raise.</p>
         </div>
       </aside>
     </main>

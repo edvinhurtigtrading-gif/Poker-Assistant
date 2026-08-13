@@ -164,6 +164,63 @@ function setButtonState(){
   bet.disabled=locked||state.currentBet>0;raise.disabled=locked||state.currentBet<=0;
   document.getElementById("sizeRow").style.opacity=pendingAction?"1":".45";
 }
+
+function heroIsActing(){
+  return state.actorSeat===0 && !state.awaitingBoard && !state.awaitingHeroCards && !state.handComplete;
+}
+function effectiveStackVsActiveOpponents(){
+  const hero=state.players[0];
+  const opponents=state.players.filter((p,i)=>i!==0&&!p.folded);
+  if(!opponents.length)return 0;
+  const maxCallable=Math.max(...opponents.map(p=>p.stack));
+  return Math.min(hero.stack,maxCallable);
+}
+function calculateMath(){
+  const heroTurn=heroIsActing();
+  const hero=state.players[0];
+  const call=heroTurn?amountToCallFor(0):0;
+  const potBefore=state.pot;
+  const finalPotAfterCall=potBefore+call;
+  const requiredEquity=call>0 && finalPotAfterCall>0 ? call/finalPotAfterCall : 0;
+  const potOdds=requiredEquity;
+  const effectiveStack=effectiveStackVsActiveOpponents();
+  const spr=state.street!=="preflop" && potBefore>0 ? effectiveStack/potBefore : null;
+  return {heroTurn,call,potBefore,finalPotAfterCall,requiredEquity,potOdds,effectiveStack,spr};
+}
+function pct(x){return `${(x*100).toFixed(1)}%`}
+function renderMathPanel(){
+  const m=calculateMath();
+  const note=document.getElementById("mathHeroNote");
+  const exp=document.getElementById("mathExplanation");
+  document.getElementById("mathPot").textContent=fmt(m.potBefore);
+  document.getElementById("mathCall").textContent=m.heroTurn?fmt(m.call):"—";
+  document.getElementById("mathEffectiveStack").textContent=fmt(m.effectiveStack);
+  document.getElementById("mathSpr").textContent=m.spr===null?"Preflop":m.spr.toFixed(2);
+
+  if(!m.heroTurn){
+    document.getElementById("mathPotOdds").textContent="—";
+    document.getElementById("mathRequiredEquity").textContent="—";
+    note.textContent=state.awaitingHeroCards
+      ?"Välj först dina två hålkort."
+      :state.awaitingBoard
+        ?`Mata in ${state.street.toUpperCase()}-kortet/korten.`
+        :"Matematikpanelen aktiveras när Hero står på tur.";
+    exp.textContent="När Hero står på tur visas pot odds, required equity och SPR automatiskt.";
+    return;
+  }
+
+  note.textContent=`Hero är på tur som ${posForSeat(0)}.`;
+  if(m.call>0){
+    document.getElementById("mathPotOdds").textContent=pct(m.potOdds);
+    document.getElementById("mathRequiredEquity").textContent=pct(m.requiredEquity);
+    exp.innerHTML=`En call kostar <strong>${fmt(m.call)}</strong>. Efter call blir den totala potten <strong>${fmt(m.finalPotAfterCall)}</strong>. Hero behöver därför minst <strong class="math-highlight">${pct(m.requiredEquity)} equity</strong> för att en ren call ska nå break-even, innan framtida betting och implied odds tas med.`;
+  }else{
+    document.getElementById("mathPotOdds").textContent="0.0%";
+    document.getElementById("mathRequiredEquity").textContent="0.0%";
+    exp.innerHTML=`Hero kan <strong>checka gratis</strong>. Required equity för att fortsätta via check är därför 0%.${m.spr!==null?` Aktuell SPR är <strong>${m.spr.toFixed(2)}</strong>.`:""}`;
+  }
+}
+
 function render(){
   document.getElementById("handNumber").textContent=`#${state.handNumber}`;
   document.getElementById("streetLabel").textContent=streetName(state.street);
@@ -195,7 +252,7 @@ function render(){
   for(let s=0;s<6;s++){const row=document.createElement("div");row.className=`position-row ${s===0?"hero":""}`;row.innerHTML=`<span>${NAMES[s]}</span><strong>${posForSeat(s)}</strong>`;list.appendChild(row)}
   const hist=document.getElementById("history");hist.innerHTML="";let lastStreet="";
   state.history.forEach(h=>{if(h.street!==lastStreet){const st=document.createElement("div");st.className="history-street";st.textContent=h.street.toUpperCase();hist.appendChild(st);lastStreet=h.street}const ln=document.createElement("div");ln.className="history-line";ln.textContent=h.text;hist.appendChild(ln)});
-  setButtonState();
+  setButtonState();renderMathPanel();
   const overlay=document.getElementById("entryOverlay"), entryCards=document.getElementById("entryCards");
   const showEntry=state.awaitingHeroCards||state.awaitingBoard;
   overlay.classList.toggle("hidden",!showEntry);

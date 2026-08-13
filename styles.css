@@ -8,3 +8,12 @@ button:disabled{opacity:.28!important;cursor:not-allowed!important;filter:satura
 .entry-cards{display:flex;justify-content:center;gap:12px}.entry-card{width:82px;height:112px;border-radius:12px;border:2px dashed rgba(216,255,79,.48);background:rgba(255,255,255,.07);color:#fff;font-size:31px;font-weight:900;cursor:pointer}
 .entry-card.filled{background:#f6f6f2;border-style:solid;border-color:#fff;color:#111}.entry-card.card-red{color:#e34b4b}
 @media(max-width:760px){.entry-panel{min-width:310px;padding:22px}.entry-card{width:72px;height:100px}}
+
+.math-panel{border-color:rgba(216,255,79,.22)}
+.math-hero-note{padding:9px 10px;border-radius:10px;background:rgba(216,255,79,.07);border:1px solid rgba(216,255,79,.12);color:#d8e6de;font-size:12px;margin-bottom:10px}
+.math-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.math-stat{padding:10px;border-radius:10px;background:rgba(255,255,255,.035)}
+.math-stat span{display:block;color:var(--muted);font-size:10px;margin-bottom:3px}
+.math-stat strong{font-size:15px}
+.math-explanation{margin-top:10px;padding:11px 12px;border-radius:10px;background:rgba(255,255,255,.035);color:#c8d5ce;font-size:12px;line-height:1.45}
+.math-highlight{color:var(--accent)!important}
