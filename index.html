@@ -1,763 +1,172 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="sv">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PokerLab &mdash; NLHE bord</title>
-<script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
-<script src="https://cdn.tailwindcss.com"></script>
-<style>
-  html, body { margin: 0; background: #0a0a0a; min-height: 100vh; }
-  body { display: flex; align-items: flex-start; justify-content: center; padding: 24px 12px; }
-  #root { width: 100%; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Poker Assistant v0.2</title>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-<div id="root"></div>
-<script type="text/babel" data-presets="react">
-const { useState, useMemo, useCallback } = React;
-
-const RANKS = ["A", "K", "Q", "J", "T", "9", "8", "7", "6", "5", "4", "3", "2"];
-const SUITS = [
-  { key: "s", symbol: "\u2660", color: "text-neutral-900" },
-  { key: "h", symbol: "\u2665", color: "text-rose-600" },
-  { key: "d", symbol: "\u2666", color: "text-sky-600" },
-  { key: "c", symbol: "\u2663", color: "text-emerald-700" },
-];
-const SUIT_MAP = Object.fromEntries(SUITS.map((s) => [s.key, s]));
-
-const POOLS = {
-  2: ["BTN", "BB"],
-  3: ["BTN", "SB", "BB"],
-  4: ["BTN", "SB", "BB", "UTG"],
-  5: ["BTN", "SB", "BB", "UTG", "CO"],
-  6: ["BTN", "SB", "BB", "UTG", "HJ", "CO"],
-  7: ["BTN", "SB", "BB", "UTG", "LJ", "HJ", "CO"],
-  8: ["BTN", "SB", "BB", "UTG", "UTG1", "LJ", "HJ", "CO"],
-  9: ["BTN", "SB", "BB", "UTG", "UTG1", "UTG2", "LJ", "HJ", "CO"],
-};
-
-function assignPositions(seatIds, dealerId) {
-  const n = seatIds.length;
-  const start = seatIds.indexOf(dealerId);
-  const rotated = [...seatIds.slice(start), ...seatIds.slice(0, start)];
-  const pool = POOLS[n];
-  const map = {};
-  rotated.forEach((sid, i) => (map[sid] = pool[i]));
-  return map;
-}
-
-function preflopOrder(seatIds, dealerId) {
-  const start = seatIds.indexOf(dealerId);
-  const rotated = [...seatIds.slice(start), ...seatIds.slice(0, start)];
-  if (seatIds.length === 2) return [rotated[0], rotated[1]];
-  return [...rotated.slice(3), ...rotated.slice(0, 3)];
-}
-
-function postflopOrder(seatIds, dealerId) {
-  const start = seatIds.indexOf(dealerId);
-  const rotated = [...seatIds.slice(start), ...seatIds.slice(0, start)];
-  if (seatIds.length === 2) return [rotated[1], rotated[0]];
-  return [...rotated.slice(1), rotated[0]];
-}
-
-function cardStr(c) {
-  return c ? `${c.rank}${c.suit}` : "";
-}
-
-function seatPositionsAround(n, radiusX, radiusY, cx, cy) {
-  const pts = [];
-  for (let i = 0; i < n; i++) {
-    const angle = (Math.PI * 2 * i) / n - Math.PI / 2;
-    pts.push({ x: cx + radiusX * Math.cos(angle), y: cy + radiusY * Math.sin(angle) });
-  }
-  return pts;
-}
-
-function MiniCard({ card, size = "sm" }) {
-  if (!card) {
-    return (
-      <div
-        className={`${size === "sm" ? "w-6 h-8" : "w-9 h-12"} rounded border border-dashed border-neutral-400 bg-neutral-800/40`}
-      />
-    );
-  }
-  const suit = SUIT_MAP[card.suit];
-  return (
-    <div
-      className={`${size === "sm" ? "w-6 h-8 text-[11px]" : "w-9 h-12 text-sm"} rounded bg-neutral-50 border border-neutral-300 flex flex-col items-center justify-center font-semibold leading-none ${suit.color}`}
-    >
-      <span>{card.rank}</span>
-      <span>{suit.symbol}</span>
-    </div>
-  );
-}
-
-function CardPicker({ usedCards, onPick, onClose, title }) {
-  const [rank, setRank] = useState(null);
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
-      <div
-        className="bg-neutral-900 border border-neutral-700 rounded-xl p-4 w-full max-w-sm"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-neutral-200 text-sm font-medium">{title}</span>
-          <button onClick={onClose} className="text-neutral-400 hover:text-neutral-200 text-sm">
-            close
-          </button>
-        </div>
-        {!rank ? (
-          <div className="grid grid-cols-5 gap-2">
-            {RANKS.map((r) => (
-              <button
-                key={r}
-                onClick={() => setRank(r)}
-                className="h-11 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-100 font-semibold text-lg"
-              >
-                {r}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div>
-            <div className="grid grid-cols-4 gap-2 mb-3">
-              {SUITS.map((s) => {
-                const key = `${rank}${s.key}`;
-                const used = usedCards.has(key);
-                return (
-                  <button
-                    key={s.key}
-                    disabled={used}
-                    onClick={() => {
-                      onPick({ rank, suit: s.key });
-                      setRank(null);
-                    }}
-                    className={`h-14 rounded-lg flex flex-col items-center justify-center font-semibold text-xl border ${
-                      used
-                        ? "opacity-25 cursor-not-allowed bg-neutral-850 border-neutral-800"
-                        : "bg-neutral-50 hover:bg-white border-neutral-300"
-                    } ${s.color}`}
-                  >
-                    <span>{rank}</span>
-                    <span>{s.symbol}</span>
-                  </button>
-                );
-              })}
-            </div>
-            <button onClick={() => setRank(null)} className="text-xs text-neutral-400 hover:text-neutral-200">
-              &larr; back to ranks
-            </button>
-          </div>
-        )}
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">POKER ASSISTANT</div>
+        <h1>6-Max Table State</h1>
       </div>
-    </div>
-  );
-}
-
-const TABLE_SIZES = [2, 6, 9];
-
-function PokerLabTable() {
-  const [numPlayers, setNumPlayers] = useState(6);
-  const [startStack, setStartStack] = useState(100);
-  const [sb, setSb] = useState(0.5);
-  const [bb, setBb] = useState(1);
-  const [heroSeat, setHeroSeat] = useState(0);
-  const [started, setStarted] = useState(false);
-
-  const [seats, setSeats] = useState([]);
-  const [dealerId, setDealerId] = useState(0);
-  const [street, setStreet] = useState("preflop");
-  const [board, setBoard] = useState([]);
-  const [pot, setPot] = useState(0);
-  const [currentBet, setCurrentBet] = useState(0);
-  const [toActOrder, setToActOrder] = useState([]);
-  const [toActIndex, setToActIndex] = useState(0);
-  const [history, setHistory] = useState([]);
-  const [undoStack, setUndoStack] = useState([]);
-  const [heroCards, setHeroCards] = useState([null, null]);
-  const [pickerTarget, setPickerTarget] = useState(null); // 'hero0' | 'hero1' | 'flop0'.. | 'turn' | 'river'
-  const [customBetOpen, setCustomBetOpen] = useState(false);
-  const [customBetValue, setCustomBetValue] = useState("");
-  const [handNumber, setHandNumber] = useState(1);
-
-  const usedCards = useMemo(() => {
-    const s = new Set();
-    heroCards.forEach((c) => c && s.add(`${c.rank}${c.suit}`));
-    board.forEach((c) => c && s.add(`${c.rank}${c.suit}`));
-    return s;
-  }, [heroCards, board]);
-
-  const seatIds = seats.map((s) => s.id);
-
-  function snapshot() {
-    return {
-      seats: JSON.parse(JSON.stringify(seats)),
-      street,
-      board: [...board],
-      pot,
-      currentBet,
-      toActOrder: [...toActOrder],
-      toActIndex,
-      history: [...history],
-    };
-  }
-
-  function pushUndo() {
-    setUndoStack((u) => [...u, snapshot()]);
-  }
-
-  function undo() {
-    if (undoStack.length === 0) return;
-    const prev = undoStack[undoStack.length - 1];
-    setUndoStack((u) => u.slice(0, -1));
-    setSeats(prev.seats);
-    setStreet(prev.street);
-    setBoard(prev.board);
-    setPot(prev.pot);
-    setCurrentBet(prev.currentBet);
-    setToActOrder(prev.toActOrder);
-    setToActIndex(prev.toActIndex);
-    setHistory(prev.history);
-  }
-
-  function beginHand(dealer, seatList) {
-    const posMap = assignPositions(
-      seatList.map((s) => s.id),
-      dealer
-    );
-    const withPos = seatList.map((s) => ({
-      ...s,
-      position: posMap[s.id],
-      status: "active",
-      committed: 0,
-    }));
-    const heroSeatObj = seatList.find((s) => s.id === heroSeat);
-    const activeIds = withPos.map((s) => s.id);
-    const isHU = activeIds.length === 2;
-
-    let localSeats = withPos.map((s) => ({ ...s }));
-    let localPot = 0;
-
-    const post = (seatIdVal, amt) => {
-      const idx = localSeats.findIndex((s) => s.id === seatIdVal);
-      const put = Math.min(amt, localSeats[idx].stack);
-      localSeats[idx] = {
-        ...localSeats[idx],
-        stack: localSeats[idx].stack - put,
-        committed: localSeats[idx].committed + put,
-      };
-      localPot += put;
-    };
-
-    const sbSeat = isHU ? dealer : withPos.find((s) => s.position === "SB").id;
-    const bbSeat = withPos.find((s) => s.position === "BB").id;
-    post(sbSeat, sb);
-    post(bbSeat, bb);
-
-    setSeats(localSeats);
-    setDealerId(dealer);
-    setStreet("preflop");
-    setBoard([]);
-    setPot(localPot);
-    setCurrentBet(Math.max(...localSeats.map((s) => s.committed)));
-    setHistory([
-      { text: `Hand #${handNumber}: dealer is seat ${dealer + 1} (${posMap[dealer]})`, kind: "meta" },
-      { text: `${posMap[sbSeat]} posts SB ${sb} BB`, kind: "action" },
-      { text: `${posMap[bbSeat]} posts BB ${bb} BB`, kind: "action" },
-    ]);
-    setToActOrder(preflopOrder(activeIds, dealer));
-    setToActIndex(0);
-    setUndoStack([]);
-    setHeroCards([null, null]);
-  }
-
-  function startTable() {
-    const initial = Array.from({ length: numPlayers }, (_, i) => ({
-      id: i,
-      name: `Seat ${i + 1}`,
-      stack: startStack,
-      isHero: i === heroSeat,
-    }));
-    setStarted(true);
-    beginHand(0, initial);
-  }
-
-  function nextHand() {
-    const nextDealer = (dealerId + 1) % seats.length;
-    const carried = seats.map((s) => ({ id: s.id, name: s.name, stack: s.stack, isHero: s.id === heroSeat }));
-    setHandNumber((h) => h + 1);
-    beginHand(nextDealer, carried);
-  }
-
-  function currentActorId() {
-    if (toActIndex >= toActOrder.length) return null;
-    return toActOrder[toActIndex];
-  }
-
-  function seatById(id) {
-    return seats.find((s) => s.id === id);
-  }
-
-  function amountToCall(id) {
-    const s = seatById(id);
-    return Math.max(0, currentBet - (s ? s.committed : 0));
-  }
-
-  function advanceStreetIfNeeded(nextSeats, order, idx, cBet) {
-    const contestants = nextSeats.filter((s) => s.status === "active" || s.status === "all_in");
-    const activeCount = contestants.filter((s) => s.status === "active").length;
-    const roundOver = activeCount <= 1 || idx >= order.length;
-    if (!roundOver) {
-      return { done: false };
-    }
-    if (activeCount <= 1) {
-      return { done: true, handOver: true };
-    }
-    const streets = ["preflop", "flop", "turn", "river", "done"];
-    const nextStreet = streets[streets.indexOf(street) + 1];
-    return { done: true, handOver: nextStreet === "done", nextStreet };
-  }
-
-  function applyAction(action, amount) {
-    const actorId = currentActorId();
-    if (actorId === null) return;
-    pushUndo();
-
-    let localSeats = seats.map((s) => ({ ...s }));
-    const idx = localSeats.findIndex((s) => s.id === actorId);
-    const posLabel = localSeats[idx].position;
-    let localPot = pot;
-    let localBet = currentBet;
-    let newOrder = toActOrder;
-    let newIndex = toActIndex + 1;
-    let reopened = false;
-    let logLine = "";
-
-    if (action === "fold") {
-      localSeats[idx].status = "folded";
-      logLine = `${posLabel} folds`;
-    } else if (action === "check") {
-      logLine = `${posLabel} checks`;
-    } else if (action === "call") {
-      const call = Math.min(amountToCall(actorId), localSeats[idx].stack);
-      localSeats[idx].stack -= call;
-      localSeats[idx].committed += call;
-      localPot += call;
-      if (localSeats[idx].stack === 0) localSeats[idx].status = "all_in";
-      logLine = `${posLabel} calls ${call.toFixed(1)} BB`;
-    } else if (action === "bet" || action === "raise") {
-      const toAmount = amount;
-      const delta = toAmount - localSeats[idx].committed;
-      localSeats[idx].stack -= delta;
-      localSeats[idx].committed = toAmount;
-      localPot += delta;
-      if (localSeats[idx].stack === 0) localSeats[idx].status = "all_in";
-      localBet = toAmount;
-      logLine = `${posLabel} ${action === "bet" ? "bets" : "raises to"} ${toAmount.toFixed(1)} BB`;
-      const activeIds = localSeats.filter((s) => s.status !== "folded" && s.status !== "sitting_out").map((s) => s.id);
-      const order = street === "preflop" ? preflopOrder(activeIds, dealerId) : postflopOrder(activeIds, dealerId);
-      const start = order.indexOf(actorId);
-      newOrder = [...order.slice(start + 1), ...order.slice(0, start)];
-      newIndex = 0;
-      reopened = true;
-    } else if (action === "all_in") {
-      const delta = localSeats[idx].stack;
-      const toAmount = localSeats[idx].committed + delta;
-      localSeats[idx].stack = 0;
-      localSeats[idx].committed = toAmount;
-      localPot += delta;
-      localSeats[idx].status = "all_in";
-      logLine = `${posLabel} is all-in for ${toAmount.toFixed(1)} BB`;
-      if (toAmount > localBet) {
-        localBet = toAmount;
-        const activeIds = localSeats.filter((s) => s.status !== "folded" && s.status !== "sitting_out").map((s) => s.id);
-        const order = street === "preflop" ? preflopOrder(activeIds, dealerId) : postflopOrder(activeIds, dealerId);
-        const start = order.indexOf(actorId);
-        newOrder = [...order.slice(start + 1), ...order.slice(0, start)];
-        newIndex = 0;
-        reopened = true;
-      }
-    }
-
-    if (!reopened) {
-      while (newIndex < toActOrder.length) {
-        const sid = toActOrder[newIndex];
-        const st = localSeats.find((s) => s.id === sid).status;
-        if (st === "active") break;
-        newIndex++;
-      }
-    } else {
-      while (newIndex < newOrder.length) {
-        const sid = newOrder[newIndex];
-        const st = localSeats.find((s) => s.id === sid).status;
-        if (st === "active") break;
-        newIndex++;
-      }
-    }
-
-    const orderForCheck = reopened ? newOrder : toActOrder;
-    const result = advanceStreetIfNeeded(localSeats, orderForCheck, newIndex, localBet);
-
-    setSeats(localSeats);
-    setPot(localPot);
-    setHistory((h) => [...h, { text: logLine, kind: "action" }]);
-
-    if (result.done) {
-      if (result.handOver) {
-        setStreet("done");
-        setToActOrder([]);
-        setToActIndex(0);
-        setCurrentBet(0);
-        setHistory((h) => [...h, { text: "Betting is over — hand complete", kind: "meta" }]);
-      } else {
-        const clearedSeats = localSeats.map((s) => ({ ...s, committed: 0 }));
-        setSeats(clearedSeats);
-        setCurrentBet(0);
-        setStreet(result.nextStreet);
-        const remainingActive = clearedSeats.filter((s) => s.status !== "folded" && s.status !== "sitting_out").map((s) => s.id);
-        const nOrder = postflopOrder(remainingActive, dealerId);
-        setToActOrder(nOrder);
-        let ni = 0;
-        while (ni < nOrder.length) {
-          const st = clearedSeats.find((s) => s.id === nOrder[ni]).status;
-          if (st === "active") break;
-          ni++;
-        }
-        setToActIndex(ni);
-        setHistory((h) => [...h, { text: `-- ${result.nextStreet.toUpperCase()} --`, kind: "street" }]);
-      }
-    } else {
-      setToActOrder(orderForCheck);
-      setToActIndex(newIndex);
-      setCurrentBet(localBet);
-    }
-  }
-
-  function potFractionAmount(fraction) {
-    const actorId = currentActorId();
-    const call = amountToCall(actorId);
-    const potAfterCall = pot + call;
-    const raw = call + fraction * potAfterCall;
-    const s = seatById(actorId);
-    return Math.min(Math.round((s.committed + raw) * 10) / 10, s.committed + s.stack);
-  }
-
-  const spr = useMemo(() => {
-    const activeSeats = seats.filter((s) => s.status === "active");
-    if (activeSeats.length !== 2 || pot === 0) return null;
-    return Math.min(...activeSeats.map((s) => s.stack)) / pot;
-  }, [seats, pot]);
-
-  const actorId = currentActorId();
-  const actor = actorId !== null ? seatById(actorId) : null;
-  const callAmt = actor ? amountToCall(actorId) : 0;
-
-  const boardSlots = street === "preflop" ? 0 : street === "flop" ? 3 : street === "turn" ? 4 : 5;
-
-  const setBoardCard = (index, card) => {
-    setBoard((b) => {
-      const copy = [...b];
-      copy[index] = card;
-      return copy;
-    });
-  };
-
-  const positions = useMemo(() => {
-    if (seats.length === 0) return [];
-    return seatPositionsAround(seats.length, 165, 105, 200, 150);
-  }, [seats.length]);
-
-  if (!started) {
-    return (
-      <div className="w-full max-w-md mx-auto bg-neutral-950 rounded-2xl border border-neutral-800 p-6 text-neutral-200">
-        <h2 className="text-lg font-semibold mb-4 text-neutral-100">Set up the table</h2>
-        <div className="mb-4">
-          <div className="text-xs text-neutral-400 mb-1">Table size</div>
-          <div className="flex gap-2">
-            {TABLE_SIZES.map((n) => (
-              <button
-                key={n}
-                onClick={() => setNumPlayers(n)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium border ${
-                  numPlayers === n
-                    ? "bg-amber-500 text-neutral-900 border-amber-500"
-                    : "bg-neutral-900 border-neutral-700 hover:border-neutral-500"
-                }`}
-              >
-                {n}-max
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <label className="text-xs text-neutral-400">
-            Starting stack (BB)
-            <input
-              type="number"
-              value={startStack}
-              onChange={(e) => setStartStack(Number(e.target.value))}
-              className="mt-1 w-full bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-2 text-neutral-100"
-            />
-          </label>
-          <label className="text-xs text-neutral-400">
-            Hero seat
-            <select
-              value={heroSeat}
-              onChange={(e) => setHeroSeat(Number(e.target.value))}
-              className="mt-1 w-full bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-2 text-neutral-100"
-            >
-              {Array.from({ length: numPlayers }, (_, i) => (
-                <option key={i} value={i}>
-                  Seat {i + 1}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-xs text-neutral-400">
-            Small blind (BB)
-            <input
-              type="number"
-              step="0.1"
-              value={sb}
-              onChange={(e) => setSb(Number(e.target.value))}
-              className="mt-1 w-full bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-2 text-neutral-100"
-            />
-          </label>
-          <label className="text-xs text-neutral-400">
-            Big blind (BB)
-            <input
-              type="number"
-              step="0.1"
-              value={bb}
-              onChange={(e) => setBb(Number(e.target.value))}
-              className="mt-1 w-full bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-2 text-neutral-100"
-            />
-          </label>
-        </div>
-        <button
-          onClick={startTable}
-          className="w-full py-3 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-900 font-semibold"
-        >
-          Start table
-        </button>
+      <div class="hand-meta">
+        <div class="meta-card"><span>Hand</span><strong id="handNumber">#1</strong></div>
+        <div class="meta-card"><span>Hero position</span><strong id="heroPosition">UTG</strong></div>
+        <div class="meta-card"><span>Street</span><strong id="streetLabel">Preflop</strong></div>
       </div>
-    );
-  }
+    </header>
 
-  return (
-    <div className="w-full max-w-3xl mx-auto bg-neutral-950 rounded-2xl border border-neutral-800 p-4 text-neutral-200">
-      <div className="flex items-center justify-between mb-2 text-xs text-neutral-400">
-        <span>Hand #{handNumber}</span>
-        <span>
-          Street: <span className="text-neutral-200 font-medium uppercase">{street}</span>
-        </span>
-        <span>
-          Pot: <span className="text-amber-400 font-semibold">{pot.toFixed(1)} BB</span>
-        </span>
-        {spr !== null && <span>SPR: {spr.toFixed(1)}</span>}
-      </div>
-
-      <div className="relative w-full" style={{ height: 300 }}>
-        <div
-          className="absolute rounded-full border-4 border-emerald-900 bg-emerald-950"
-          style={{ left: 40, top: 40, width: 320, height: 220 }}
-        />
-        <div className="absolute left-1/2 top-[95px] -translate-x-1/2 flex gap-1">
-          {board.map((c, i) => (
-            <MiniCard key={i} card={c} size="md" />
-          ))}
-          {Array.from({ length: boardSlots - board.filter(Boolean).length }).map((_, i) => (
-            <MiniCard key={`empty-${i}`} card={null} size="md" />
-          ))}
-        </div>
-
-        {seats.map((s, i) => {
-          const p = positions[i];
-          const isActing = actorId === s.id;
-          return (
-            <div
-              key={s.id}
-              className={`absolute -translate-x-1/2 -translate-y-1/2 w-24 text-center rounded-lg border px-2 py-1 ${
-                isActing
-                  ? "border-amber-400 bg-amber-500/10"
-                  : s.status === "folded"
-                  ? "border-neutral-800 bg-neutral-900/60 opacity-50"
-                  : "border-neutral-700 bg-neutral-900"
-              }`}
-              style={{ left: p.x, top: p.y }}
-            >
-              <div className="text-[11px] font-medium flex items-center justify-center gap-1">
-                {s.id === dealerId && (
-                  <span className="w-3 h-3 rounded-full bg-neutral-100 text-neutral-900 text-[8px] leading-3 font-bold">
-                    D
-                  </span>
-                )}
-                <span className={s.isHero ? "text-amber-400" : ""}>{s.position}</span>
-              </div>
-              <div className="text-[10px] text-neutral-400">{s.stack.toFixed(1)} BB</div>
-              {s.committed > 0 && <div className="text-[10px] text-emerald-400">{s.committed.toFixed(1)} in</div>}
-              {s.isHero && (
-                <div className="flex justify-center gap-0.5 mt-1">
-                  <button onClick={() => setPickerTarget("hero0")}>
-                    <MiniCard card={heroCards[0]} />
-                  </button>
-                  <button onClick={() => setPickerTarget("hero1")}>
-                    <MiniCard card={heroCards[1]} />
-                  </button>
+    <main class="layout">
+      <section class="table-section">
+        <div class="table-wrap">
+          <div class="poker-table">
+            <div class="felt-inner">
+              <div class="board-area">
+                <div class="pot-label">POT</div>
+                <div class="pot-value" id="potValue">1.5 BB</div>
+                <div class="board-cards">
+                  <button class="card-slot" data-card-slot="board0">+</button>
+                  <button class="card-slot" data-card-slot="board1">+</button>
+                  <button class="card-slot" data-card-slot="board2">+</button>
+                  <button class="card-slot" data-card-slot="board3">+</button>
+                  <button class="card-slot" data-card-slot="board4">+</button>
                 </div>
-              )}
-              {s.status === "folded" && <div className="text-[9px] text-neutral-500">folded</div>}
-              {s.status === "all_in" && <div className="text-[9px] text-rose-400">all-in</div>}
+                <div class="to-act" id="toAct">UTG to act</div>
+              </div>
             </div>
-          );
-        })}
-      </div>
 
-      {street !== "done" && boardSlots > 0 && board.filter(Boolean).length < boardSlots && (
-        <div className="flex items-center justify-center gap-1 mb-3 text-xs text-neutral-400">
-          <span>Set {street}:</span>
-          {Array.from({ length: boardSlots }).map((_, i) => (
-            <button key={i} onClick={() => setPickerTarget(`board${i}`)}>
-              <MiniCard card={board[i]} size="md" />
-            </button>
-          ))}
-        </div>
-      )}
+            <div class="seat seat-0 hero-seat" data-seat="0">
+              <div class="seat-card">
+                <div class="seat-topline">
+                  <span class="player-name">HERO</span>
+                  <span class="position-badge" id="position-0">UTG</span>
+                </div>
+                <div class="stack" id="stack-0">100 BB</div>
+                <div class="current-bet" id="bet-0"></div>
+                <div class="hero-cards">
+                  <button class="mini-card" data-card-slot="hero0">+</button>
+                  <button class="mini-card" data-card-slot="hero1">+</button>
+                </div>
+              </div>
+              <div class="dealer-button" id="dealer-0">D</div>
+            </div>
 
-      {actor && street !== "done" && (
-        <div className="mt-2">
-          <div className="text-xs text-neutral-400 mb-2 text-center">
-            {actor.position} to act &middot; call {callAmt.toFixed(1)} BB &middot; current bet {currentBet.toFixed(1)} BB
-          </div>
-          <div className="grid grid-cols-3 gap-2 mb-2">
-            <button
-              onClick={() => applyAction("fold")}
-              className="py-3 rounded-lg bg-rose-900/40 hover:bg-rose-900/60 border border-rose-800 font-semibold text-sm"
-            >
-              Fold
-            </button>
-            {callAmt === 0 ? (
-              <button
-                onClick={() => applyAction("check")}
-                className="py-3 rounded-lg bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 font-semibold text-sm"
-              >
-                Check
-              </button>
-            ) : (
-              <button
-                onClick={() => applyAction("call")}
-                className="py-3 rounded-lg bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 font-semibold text-sm"
-              >
-                Call {callAmt.toFixed(1)}
-              </button>
-            )}
-            <button
-              onClick={() => applyAction("all_in")}
-              className="py-3 rounded-lg bg-amber-900/40 hover:bg-amber-900/60 border border-amber-700 font-semibold text-sm"
-            >
-              All-in
-            </button>
-          </div>
-          <div className="text-[11px] text-neutral-500 mb-1">
-            {currentBet === 0 ? "Bet sizing (of pot)" : "Raise sizing (to)"}
-          </div>
-          <div className="grid grid-cols-4 gap-2 mb-2">
-            {[0.33, 0.5, 0.75, 1].map((f) => (
-              <button
-                key={f}
-                onClick={() => applyAction(currentBet === 0 ? "bet" : "raise", potFractionAmount(f))}
-                className="py-2 rounded-lg bg-emerald-900/30 hover:bg-emerald-900/50 border border-emerald-800 text-xs font-medium"
-              >
-                {Math.round(f * 100)}%
-              </button>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            <input
-              type="number"
-              placeholder="custom to-amount"
-              value={customBetValue}
-              onChange={(e) => setCustomBetValue(e.target.value)}
-              className="flex-1 bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm"
-            />
-            <button
-              onClick={() => {
-                const v = Number(customBetValue);
-                if (v > 0) {
-                  applyAction(currentBet === 0 ? "bet" : "raise", v);
-                  setCustomBetValue("");
-                }
-              }}
-              className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-sm font-medium"
-            >
-              {currentBet === 0 ? "Bet" : "Raise"}
-            </button>
+            <div class="seat seat-1" data-seat="1">
+              <div class="seat-card">
+                <div class="seat-topline"><span class="player-name">Player 2</span><span class="position-badge" id="position-1">HJ</span></div>
+                <div class="stack" id="stack-1">100 BB</div><div class="current-bet" id="bet-1"></div>
+              </div><div class="dealer-button" id="dealer-1">D</div>
+            </div>
+
+            <div class="seat seat-2" data-seat="2">
+              <div class="seat-card">
+                <div class="seat-topline"><span class="player-name">Player 3</span><span class="position-badge" id="position-2">CO</span></div>
+                <div class="stack" id="stack-2">100 BB</div><div class="current-bet" id="bet-2"></div>
+              </div><div class="dealer-button" id="dealer-2">D</div>
+            </div>
+
+            <div class="seat seat-3" data-seat="3">
+              <div class="seat-card">
+                <div class="seat-topline"><span class="player-name">Player 4</span><span class="position-badge" id="position-3">BTN</span></div>
+                <div class="stack" id="stack-3">100 BB</div><div class="current-bet" id="bet-3"></div>
+              </div><div class="dealer-button" id="dealer-3">D</div>
+            </div>
+
+            <div class="seat seat-4" data-seat="4">
+              <div class="seat-card">
+                <div class="seat-topline"><span class="player-name">Player 5</span><span class="position-badge" id="position-4">SB</span></div>
+                <div class="stack" id="stack-4">99.5 BB</div><div class="current-bet" id="bet-4">0.5 BB</div>
+              </div><div class="dealer-button" id="dealer-4">D</div>
+            </div>
+
+            <div class="seat seat-5" data-seat="5">
+              <div class="seat-card">
+                <div class="seat-topline"><span class="player-name">Player 6</span><span class="position-badge" id="position-5">BB</span></div>
+                <div class="stack" id="stack-5">99 BB</div><div class="current-bet" id="bet-5">1 BB</div>
+              </div><div class="dealer-button" id="dealer-5">D</div>
+            </div>
           </div>
         </div>
-      )}
 
-      <div className="flex gap-2 mt-3">
-        <button
-          onClick={undo}
-          disabled={undoStack.length === 0}
-          className="flex-1 py-2 rounded-lg bg-neutral-900 border border-neutral-700 text-sm disabled:opacity-30"
-        >
-          Undo last action
-        </button>
-        <button
-          onClick={nextHand}
-          className="flex-1 py-2 rounded-lg bg-neutral-100 text-neutral-900 text-sm font-semibold"
-        >
-          Next hand
-        </button>
-      </div>
-
-      <div className="mt-3 max-h-32 overflow-y-auto text-[11px] text-neutral-400 border-t border-neutral-800 pt-2 space-y-0.5">
-        {history.map((h, i) => (
-          <div
-            key={i}
-            className={
-              h.kind === "street"
-                ? "text-neutral-300 font-medium mt-1"
-                : h.kind === "meta"
-                ? "text-neutral-500 italic"
-                : ""
-            }
-          >
-            {h.text}
+        <div class="action-bar">
+          <div class="actor-summary">
+            <span id="actorName">UTG</span>
+            <strong id="amountToCall">To call: 1 BB</strong>
           </div>
-        ))}
-      </div>
+          <div class="action-buttons">
+            <button data-action="fold" class="danger-btn">Fold</button>
+            <button data-action="check" class="secondary-btn">Check</button>
+            <button data-action="call" class="secondary-btn">Call</button>
+            <button data-action="bet" class="primary-btn">Bet</button>
+            <button data-action="raise" class="primary-btn">Raise</button>
+            <button data-action="allin" class="allin-btn">All-in</button>
+          </div>
+          <div class="size-row" id="sizeRow">
+            <button data-size="0.25">25%</button>
+            <button data-size="0.33">33%</button>
+            <button data-size="0.5">50%</button>
+            <button data-size="0.66">66%</button>
+            <button data-size="0.75">75%</button>
+            <button data-size="1">Pot</button>
+            <button data-size="2.5" data-preflop="true">2.5 BB</button>
+            <button data-size="3" data-preflop="true">3 BB</button>
+            <button id="customSizeBtn">Custom</button>
+          </div>
+        </div>
 
-      {pickerTarget && (
-        <CardPicker
-          title={
-            pickerTarget.startsWith("hero")
-              ? "Choose hero card"
-              : `Choose ${street} card`
-          }
-          usedCards={usedCards}
-          onClose={() => setPickerTarget(null)}
-          onPick={(card) => {
-            if (pickerTarget === "hero0") setHeroCards((c) => [card, c[1]]);
-            else if (pickerTarget === "hero1") setHeroCards((c) => [c[0], card]);
-            else if (pickerTarget.startsWith("board")) {
-              const idx = Number(pickerTarget.replace("board", ""));
-              setBoardCard(idx, card);
-            }
-            setPickerTarget(null);
-          }}
-        />
-      )}
+        <div class="controls">
+          <button id="undoBtn" class="secondary-btn">↶ Undo</button>
+          <button id="nextStreetBtn" class="secondary-btn">Next street</button>
+          <button id="nextHand" class="primary-btn">Next hand →</button>
+          <button id="resetSession" class="ghost-btn">Reset</button>
+        </div>
+      </section>
+
+      <aside class="side-panel">
+        <div class="panel-card">
+          <div class="panel-heading"><span class="eyebrow">GAME STATE</span><h2>Hand</h2></div>
+          <div class="stat-grid">
+            <div><span>Pot</span><strong id="sidePot">1.5 BB</strong></div>
+            <div><span>Current bet</span><strong id="currentBet">1 BB</strong></div>
+            <div><span>To call</span><strong id="sideToCall">1 BB</strong></div>
+            <div><span>Active</span><strong id="activeCount">6</strong></div>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <div class="panel-heading"><span class="eyebrow">POSITIONS</span><h2>Table roles</h2></div>
+          <div class="position-list" id="positionList"></div>
+        </div>
+
+        <div class="panel-card">
+          <div class="panel-heading"><span class="eyebrow">HAND HISTORY</span><h2>Actions</h2></div>
+          <div class="history" id="history"></div>
+        </div>
+
+        <div class="panel-card coming-soon">
+          <div class="panel-heading"><span class="eyebrow">NEXT</span><h2>v0.3</h2></div>
+          <p>Pot odds, required equity, SPR och första matematiska beslutsstödet.</p>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <div class="modal-backdrop hidden" id="cardModal">
+    <div class="modal">
+      <div class="modal-head">
+        <div><span class="eyebrow">CARD PICKER</span><h2>Välj kort</h2></div>
+        <button id="closeModal" class="icon-btn">×</button>
+      </div>
+      <div class="rank-grid" id="rankGrid"></div>
+      <div class="suit-grid hidden" id="suitGrid"></div>
+      <button id="clearCardBtn" class="ghost-btn full">Ta bort kort</button>
     </div>
-  );
-}
+  </div>
 
-
-ReactDOM.createRoot(document.getElementById('root')).render(<PokerLabTable />);
-</script>
+  <script src="app.js"></script>
 </body>
 </html>
