@@ -240,30 +240,71 @@ function rangeSummary(){const r=rangeNow();const a=document.getElementById("rang
 let lastEq=null;
 function runEq(autoMode=false){
   if(!state.heroCards.every(Boolean)){if(!autoMode)alert("Välj Hero-korten först.");return}
-  const r=rangeNow();if(!r.combos.length)return;
+  const r=rangeNow();
+  if(!r.combos.length){
+    if(autoMode){
+      autoAnalysisRunning=false;
+      showAutoError("INSUFFICIENT DATA","No valid opponent combos.");
+    }
+    return;
+  }
+
   const btn=document.getElementById("runEquityBtn");
   if(btn&&!autoMode){btn.disabled=true;btn.textContent="Calculating..."}
+
   const token=++autoAnalysisToken;
-  if(autoMode)autoAnalysisRunning=true;
+  autoAnalysisRunning=autoMode;
+
+  if(autoAnalysisTimeout)clearTimeout(autoAnalysisTimeout);
+  if(autoMode){
+    autoAnalysisTimeout=setTimeout(()=>{
+      if(autoAnalysisRunning && token===autoAnalysisToken){
+        autoAnalysisRunning=false;
+        showAutoError("ANALYSIS ERROR","Calculation took too long.");
+      }
+    },2500);
+  }
+
   setTimeout(()=>{
-    let w=0,t=0,l=0,N=10000;
-    const kb=state.board.filter(Boolean).map(copy),base=new Set([...state.heroCards,...kb].map(code));
-    for(let n=0;n<N;n++){
+    try{
+      let w=0,t=0,l=0;
+      const N=autoMode?3000:10000;
+      const kb=state.board.filter(Boolean).map(copy);
+      const base=new Set([...state.heroCards,...kb].map(code));
+
+      for(let n=0;n<N;n++){
+        if(token!==autoAnalysisToken)return;
+        const vh=r.combos[Math.floor(Math.random()*r.combos.length)];
+        if(!vh || vh.some(c=>base.has(code(c)))){n--;continue}
+        const dead=new Set([...base,...vh.map(code)]);
+        const d=shuf(FULLDECK.filter(c=>!dead.has(code(c))).map(copy));
+        const bd=kb.slice();
+        while(bd.length<5 && d.length)bd.push(d.pop());
+        if(bd.length<5){n--;continue}
+
+        const q=cmp(best([...state.heroCards,...bd]),best([...vh,...bd]));
+        if(q>0)w++;
+        else if(q===0)t++;
+        else l++;
+      }
+
       if(token!==autoAnalysisToken)return;
-      const vh=r.combos[Math.floor(Math.random()*r.combos.length)];
-      if(vh.some(c=>base.has(code(c)))){n--;continue}
-      const dead=new Set([...base,...vh.map(code)]),d=shuf(FULLDECK.filter(c=>!dead.has(code(c))).map(copy)),bd=kb.slice();
-      while(bd.length<5)bd.push(d.pop());
-      const q=cmp(best([...state.heroCards,...bd]),best([...vh,...bd]));
-      q>0?w++:q===0?t++:l++;
+      lastEq={win:w/N,tie:t/N,lose:l/N,equity:(w+t*.5)/N};
+      autoAnalysisRunning=false;
+      if(autoAnalysisTimeout){clearTimeout(autoAnalysisTimeout);autoAnalysisTimeout=null}
+      renderEq();
+      if(btn&&!autoMode){btn.disabled=false;btn.textContent="Calculate equity"}
+      renderAutoDecision();
+    }catch(err){
+      console.error(err);
+      autoAnalysisRunning=false;
+      if(autoAnalysisTimeout){clearTimeout(autoAnalysisTimeout);autoAnalysisTimeout=null}
+      if(btn&&!autoMode){btn.disabled=false;btn.textContent="Calculate equity"}
+      if(autoMode)showAutoError("ANALYSIS ERROR","Unable to calculate this state.");
     }
-    lastEq={win:w/N,tie:t/N,lose:l/N,equity:(w+t*.5)/N};
-    autoAnalysisRunning=false;
-    renderEq();
-    if(btn&&!autoMode){btn.disabled=false;btn.textContent="Calculate equity"}
-    renderAutoDecision();
-  },10)
+  },0)
 }
+
 function renderEq(){if(!lastEq)return;document.getElementById("eqWin").textContent=pct(lastEq.win);document.getElementById("eqTie").textContent=pct(lastEq.tie);document.getElementById("eqLose").textContent=pct(lastEq.lose);document.getElementById("eqTotal").textContent=pct(lastEq.equity);document.getElementById("equityExplanation").innerHTML=`Hero equity vs selected estimated range: <strong class="math-highlight">${pct(lastEq.equity)}</strong>. Blocked combos are removed.`;renderEv()}
 function renderEv(){if(!lastEq)return;const eq=lastEq.equity,call=heroIsActing()?amountToCallFor(0):0,pot=state.pot,evCall=call>0?eq*(pot+call)-call:0,fp=+document.getElementById("foldSlider").value/100,frac=+document.getElementById("raiseSizeSelect").value,cost=Math.min(state.players[0].stack,pot*frac),calledPot=pot+2*cost,evCalled=eq*calledPot-cost,evRaise=fp*pot+(1-fp)*evCalled;document.getElementById("evCall").textContent=`${evCall.toFixed(2)} BB`;document.getElementById("evRaise").textContent=`${evRaise.toFixed(2)} BB`;const v=[["FOLD",0],["CALL",evCall],["RAISE",evRaise]].sort((a,b)=>b[1]-a[1]),gap=v[0][1]-v[1][1],s=gap>=2?"CLEAR":gap>=.5?"MODERATE":"CLOSE";document.getElementById("recommendation").innerHTML=`BEST: <span class="math-highlight">${v[0][0]}</span> · EV ${v[0][1].toFixed(2)} BB · ${s}`;renderAutoDecision()}
 
@@ -293,6 +334,19 @@ function actionEVs(){
   const evRaise=foldPct*pot+(1-foldPct)*evCalled;
   return {evFold,evCall,evRaise}
 }
+function showAutoError(title,message){
+  const card=document.getElementById("autoDecisionCard");
+  const banner=document.getElementById("heroTurnBanner");
+  if(card)card.classList.remove("hidden");
+  if(banner)banner.classList.remove("hidden");
+  document.getElementById("heroTurnSub").textContent=message||"Unable to analyze";
+  document.getElementById("autoDecisionAction").textContent=title;
+  document.getElementById("autoEq").textContent="—";
+  document.getElementById("autoEv").textContent="—";
+  document.getElementById("autoStrength").textContent="—";
+  document.getElementById("autoAlternatives").textContent=message||"Try changing the opponent range or undoing the last action.";
+}
+
 function renderAutoDecision(){
   const banner=document.getElementById("heroTurnBanner"),card=document.getElementById("autoDecisionCard");
   const heroTurn=heroIsActing();
@@ -301,7 +355,7 @@ function renderAutoDecision(){
   document.querySelector(".hero-seat")?.classList.toggle("hero-turn",heroTurn);
   if(!heroTurn)return;
 
-  document.getElementById("heroTurnSub").textContent=autoAnalysisRunning?"Analyzing automatically…":"Decision ready";
+  document.getElementById("heroTurnSub").textContent=autoAnalysisRunning?"Analyzing…":"Decision ready";
   const req=calculateMath().requiredEquity;
   document.getElementById("autoReq").textContent=pct(req);
 
@@ -329,7 +383,8 @@ function maybeAutoAnalyze(){
   renderAutoDecision();
   if(!heroIsActing())return;
   const sig=autoSignature();
-  if(!sig||sig===lastAutoSignature||autoAnalysisRunning)return;
+  if(!sig||autoAnalysisRunning)return;
+  if(sig===lastAutoSignature && lastEq)return;
   lastAutoSignature=sig;
   lastEq=null;
   renderAutoDecision();
