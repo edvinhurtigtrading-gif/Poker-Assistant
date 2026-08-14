@@ -37,3 +37,5 @@ button:disabled{opacity:.28!important;cursor:not-allowed!important;filter:satura
 .decision-alts{margin-top:9px;color:#c7d4cd;font-size:11px;line-height:1.4}
 .hero-seat.hero-turn .seat-card{border-color:var(--accent)!important;box-shadow:0 0 0 3px rgba(216,255,79,.18),0 0 28px rgba(216,255,79,.22),0 16px 44px rgba(0,0,0,.38)!important}
 @media(max-width:760px){.decision-metrics{grid-template-columns:1fr 1fr}.auto-decision-card{bottom:8px}}
+
+.no-edge{color:#ffd166!important}

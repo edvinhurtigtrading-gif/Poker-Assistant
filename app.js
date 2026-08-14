@@ -418,92 +418,24 @@ function runEq(autoMode=false){
 }
 
 function renderEq(){if(!lastEq)return;document.getElementById("eqWin").textContent=pct(lastEq.win);document.getElementById("eqTie").textContent=pct(lastEq.tie);document.getElementById("eqLose").textContent=pct(lastEq.lose);document.getElementById("eqTotal").textContent=pct(lastEq.equity);document.getElementById("equityExplanation").innerHTML=`Hero equity vs selected estimated range: <strong class="math-highlight">${pct(lastEq.equity)}</strong>. Blocked combos are removed. ${lastEq.runs?`Based on ${lastEq.runs} simulations${lastEq.partial?" (quick estimate)":""}.`:""}`;renderEv()}
-function renderEv(){if(!lastEq)return;const eq=lastEq.equity,call=heroIsActing()?amountToCallFor(0):0,pot=state.pot,evCall=call>0?eq*(pot+call)-call:0,fp=+document.getElementById("foldSlider").value/100,frac=+document.getElementById("raiseSizeSelect").value,cost=Math.min(state.players[0].stack,pot*frac),calledPot=pot+2*cost,evCalled=eq*calledPot-cost,evRaise=fp*pot+(1-fp)*evCalled;document.getElementById("evCall").textContent=`${evCall.toFixed(2)} BB`;document.getElementById("evRaise").textContent=`${evRaise.toFixed(2)} BB`;const v=[["FOLD",0],["CALL",evCall],["RAISE",evRaise]].sort((a,b)=>b[1]-a[1]),gap=v[0][1]-v[1][1],s=gap>=2?"CLEAR":gap>=.5?"MODERATE":"CLOSE";document.getElementById("recommendation").innerHTML=`BEST: <span class="math-highlight">${v[0][0]}</span> · EV ${v[0][1].toFixed(2)} BB · ${s}`;renderAutoDecision()}
-
-function autoSignature(){
-  if(!heroIsActing())return "";
-  const villain=villainSeat();
-  return JSON.stringify({
-    hand:state.handNumber,street:state.street,actor:state.actorSeat,pot:state.pot,
-    currentBet:state.currentBet,heroBet:state.players[0].streetBet,
-    hero:state.heroCards,board:state.board,villain,
-    preset:document.getElementById("rangePreset")?.value,
-    fold:document.getElementById("foldSlider")?.value,
-    raise:document.getElementById("raiseSizeSelect")?.value,
-    history:state.history.length
-  })
-}
-function actionEVs(){
-  if(!lastEq)return null;
-  const eq=lastEq.equity,call=heroIsActing()?amountToCallFor(0):0,pot=state.pot;
-  const evFold=0;
-  const evCall=call>0?eq*(pot+call)-call:0;
-  const foldPct=+document.getElementById("foldSlider").value/100;
-  const frac=+document.getElementById("raiseSizeSelect").value;
-  const cost=Math.min(state.players[0].stack,pot*frac);
-  const calledPot=pot+2*cost;
-  const evCalled=eq*calledPot-cost;
-  const evRaise=foldPct*pot+(1-foldPct)*evCalled;
-  return {evFold,evCall,evRaise}
-}
-function showAutoError(title,message){
-  const card=document.getElementById("autoDecisionCard");
-  const banner=document.getElementById("heroTurnBanner");
-  if(card)card.classList.remove("hidden");
-  if(banner)banner.classList.remove("hidden");
-  document.getElementById("heroTurnSub").textContent=message||"Unable to analyze";
-  document.getElementById("autoDecisionAction").textContent=title;
-  document.getElementById("autoEq").textContent="—";
-  document.getElementById("autoEv").textContent="—";
-  document.getElementById("autoStrength").textContent="—";
-  document.getElementById("autoAlternatives").textContent=message||"Try changing the opponent range or undoing the last action.";
-}
-
-function renderAutoDecision(){
-  const banner=document.getElementById("heroTurnBanner"),card=document.getElementById("autoDecisionCard");
-  const heroTurn=heroIsActing();
-  banner.classList.toggle("hidden",!heroTurn);
-  card.classList.toggle("hidden",!heroTurn);
-  document.querySelector(".hero-seat")?.classList.toggle("hero-turn",heroTurn);
-  if(!heroTurn)return;
-
-  document.getElementById("heroTurnSub").textContent=autoAnalysisRunning?"Analyzing…":"Decision ready";
-  const req=calculateMath().requiredEquity;
-  document.getElementById("autoReq").textContent=pct(req);
-
-  if(autoAnalysisRunning||!lastEq){
-    document.getElementById("autoDecisionAction").textContent="ANALYZING…";
-    document.getElementById("autoEq").textContent="—";
-    document.getElementById("autoEv").textContent="—";
-    document.getElementById("autoStrength").textContent="—";
-    document.getElementById("autoAlternatives").textContent="Equity, pot odds and EV are being calculated automatically.";
-    return;
-  }
-
+function renderEv(){
+  if(!lastEq)return;
   const ev=actionEVs(); if(!ev)return;
-  const rows=[["FOLD",ev.evFold],["CALL",ev.evCall],["RAISE",ev.evRaise]].sort((a,b)=>b[1]-a[1]);
-  const gap=rows[0][1]-rows[1][1];
-  const strength=gap>=2?"CLEAR":gap>=.5?"MODERATE":"CLOSE";
-  document.getElementById("autoDecisionAction").textContent=rows[0][0];
-  document.getElementById("autoEq").textContent=pct(lastEq.equity);
-  document.getElementById("autoEv").textContent=`${rows[0][1].toFixed(2)} BB`;
-  document.getElementById("autoStrength").textContent=strength;
-  document.getElementById("autoAlternatives").textContent=
-    rows.map(([a,v])=>`${a}: ${v.toFixed(2)} BB`).join("  ·  ");
-}
-function maybeAutoAnalyze(){
+  document.getElementById("evFold").textContent=`${ev.evFold.toFixed(2)} BB`;
+  document.getElementById("evCall").textContent=`${ev.evCall.toFixed(2)} BB`;
+  document.getElementById("evRaise").textContent=`${ev.evRaise.toFixed(2)} BB`;
+  const vals=[["FOLD",ev.evFold],["CALL",ev.evCall],["RAISE",ev.evRaise]].sort((a,b)=>b[1]-a[1]);
+  const gap=vals[0][1]-vals[1][1];
+  let strength=gap>=2?"CLEAR":gap>=.5?"MODERATE":"CLOSE";
+  let action=vals[0][0];
+  if(ev.robust==="NO CLEAR EDGE"){action="NO CLEAR EDGE";strength="CLOSE";}
+  document.getElementById("recommendation").innerHTML=
+    `BEST: <span class="${action==="NO CLEAR EDGE"?"no-edge":"math-highlight"}">${action}</span> · ${strength}<br>`+
+    `<span style="font-size:10px;color:var(--muted)">Fold ${(ev.foldPct*100).toFixed(0)}% · Call ${(ev.callFreq*100).toFixed(0)}% · Reraise ${(ev.reraisePct*100).toFixed(0)}% · Equity when called ${(ev.eqCall*100).toFixed(1)}%</span>`;
   renderAutoDecision();
-  if(!heroIsActing())return;
-  const sig=autoSignature();
-  if(!sig||autoAnalysisRunning)return;
-  if(sig===lastAutoSignature && lastEq)return;
-  lastAutoSignature=sig;
-  lastEq=null;
-  renderAutoDecision();
-  runEq(true);
 }
 
-function hookV04(){const vs=document.getElementById("villainSelect"),rp=document.getElementById("rangePreset");if(!vs)return;vs.onchange=()=>{lastEq=null;lastAutoSignature="";rangeSummary();maybeAutoAnalyze()};rp.onchange=()=>{lastEq=null;lastAutoSignature="";rangeSummary();maybeAutoAnalyze()};document.getElementById("runEquityBtn").onclick=runEq;const f=document.getElementById("foldSlider");f.oninput=()=>{document.getElementById("foldValue").textContent=`${f.value}%`;lastAutoSignature="";renderEv();maybeAutoAnalyze()};document.getElementById("raiseSizeSelect").onchange=()=>{lastAutoSignature="";renderEv();maybeAutoAnalyze()};updateVillains();rangeSummary()}
+function hookV04(){const vs=document.getElementById("villainSelect"),rp=document.getElementById("rangePreset");if(!vs)return;vs.onchange=()=>{lastEq=null;lastAutoSignature="";rangeSummary();maybeAutoAnalyze()};rp.onchange=()=>{lastEq=null;lastAutoSignature="";rangeSummary();maybeAutoAnalyze()};document.getElementById("runEquityBtn").onclick=runEq;const f=document.getElementById("foldSlider");f.oninput=()=>{document.getElementById("foldValue").textContent=`${f.value}%`;lastAutoSignature="";renderEv();maybeAutoAnalyze()};document.getElementById("raiseSizeSelect").onchange=()=>{lastAutoSignature="";renderEv();maybeAutoAnalyze()};const rr=document.getElementById("reraiseSlider");rr.oninput=()=>{document.getElementById("reraiseValue").textContent=`${rr.value}%`;lastAutoSignature="";renderEv();maybeAutoAnalyze()};updateVillains();rangeSummary()}
 
 function render(){
   document.getElementById("handNumber").textContent=`#${state.handNumber}`;

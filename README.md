@@ -1,24 +1,12 @@
-# Poker Assistant v0.4.4
+# Poker Assistant v0.4.5 — Corrected EV Engine
 
-Critical Auto Decision fix.
+Raise EV is now more conservative.
 
-## Root cause found
-The Auto Decision UI appeared, but the JavaScript state variables used by the analysis engine were never declared:
-- autoAnalysisToken
-- lastAutoSignature
-- autoAnalysisRunning
-- autoAnalysisTimeout
+- Villain range split into fold / call / reraise branches.
+- Hero equity versus calling range is reduced versus full range.
+- Reraise branch assumes Hero can lose the raise investment.
+- Sensitivity test uses fold-frequency ±10 percentage points.
+- If the best action changes across assumptions, recommendation becomes NO CLEAR EDGE.
+- Added estimated reraise frequency control.
 
-The first automatic analysis therefore threw a ReferenceError immediately after showing the popup.
-
-## Fixes
-- Added all missing auto-analysis state declarations.
-- Keeps the asynchronous batched Monte Carlo engine from v0.4.3.
-- Added a visible runtime-error fallback so future JavaScript failures show ANALYSIS ERROR instead of silently hanging.
-
-Auto analysis:
-- up to 800 simulations
-- batched to keep UI responsive
-- quick estimate if needed
-
-This remains an estimated range/EV model, not GTO.
+This is still an estimate, not a GTO solver.
