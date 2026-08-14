@@ -1,3 +1,16 @@
+
+window.addEventListener("error",(event)=>{
+  console.error("Poker Assistant runtime error:",event.error||event.message);
+  try{
+    if(typeof heroIsActing==="function" && heroIsActing()){
+      autoAnalysisRunning=false;
+      if(typeof showAutoError==="function"){
+        showAutoError("ANALYSIS ERROR",event.message||"Unexpected runtime error.");
+      }
+    }
+  }catch(_){}
+});
+
 const POSITIONS_FROM_BTN=["BTN","SB","BB","UTG","HJ","CO"];
 const NAMES=["HERO","Player 2","Player 3","Player 4","Player 5","Player 6"];
 const RANKS=["A","K","Q","J","T","9","8","7","6","5","4","3","2"];
@@ -238,6 +251,10 @@ function rangeNow(){const s=villainSeat();if(s===null)return{combos:[],t:0};cons
 function updateVillains(){const e=document.getElementById("villainSelect");if(!e)return;const old=e.value;e.innerHTML="";state.players.forEach((p,i)=>{if(i===0||p.folded)return;const o=document.createElement("option");o.value=i;o.textContent=`${NAMES[i]} · ${posForSeat(i)}`;e.appendChild(o)});if([...e.options].some(o=>o.value===old))e.value=old}
 function rangeSummary(){const r=rangeNow();const a=document.getElementById("rangeCombos"),b=document.getElementById("rangeWidth");if(a){a.textContent=r.combos.length;b.textContent=`≈ ${r.t}%`}}
 let lastEq=null;
+let autoAnalysisToken=0;
+let lastAutoSignature="";
+let autoAnalysisRunning=false;
+let autoAnalysisTimeout=null;
 function runEq(autoMode=false){
   if(!state.heroCards.every(Boolean)){
     if(!autoMode)alert("Välj Hero-korten först.");

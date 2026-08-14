@@ -1,15 +1,24 @@
-# Poker Assistant v0.4.3
+# Poker Assistant v0.4.4
 
-Fix for Auto Decision Mode hanging on ANALYZING.
+Critical Auto Decision fix.
 
-## What changed
-- Monte Carlo now runs in small asynchronous batches.
-- The browser gets control back between batches, so the UI never freezes.
-- Auto mode targets 800 simulations for fast decisions.
-- Manual equity targets 5,000 simulations.
-- Auto mode returns a quick partial estimate if the full run takes too long.
-- Timeout can now actually execute because the browser event loop is not blocked.
-- Partial deck shuffle is used for better speed.
-- The decision panel displays how many simulations were used.
+## Root cause found
+The Auto Decision UI appeared, but the JavaScript state variables used by the analysis engine were never declared:
+- autoAnalysisToken
+- lastAutoSignature
+- autoAnalysisRunning
+- autoAnalysisTimeout
 
-This is still an estimated range/EV model, not a GTO solver.
+The first automatic analysis therefore threw a ReferenceError immediately after showing the popup.
+
+## Fixes
+- Added all missing auto-analysis state declarations.
+- Keeps the asynchronous batched Monte Carlo engine from v0.4.3.
+- Added a visible runtime-error fallback so future JavaScript failures show ANALYSIS ERROR instead of silently hanging.
+
+Auto analysis:
+- up to 800 simulations
+- batched to keep UI responsive
+- quick estimate if needed
+
+This remains an estimated range/EV model, not GTO.
