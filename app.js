@@ -239,73 +239,168 @@ function updateVillains(){const e=document.getElementById("villainSelect");if(!e
 function rangeSummary(){const r=rangeNow();const a=document.getElementById("rangeCombos"),b=document.getElementById("rangeWidth");if(a){a.textContent=r.combos.length;b.textContent=`≈ ${r.t}%`}}
 let lastEq=null;
 function runEq(autoMode=false){
-  if(!state.heroCards.every(Boolean)){if(!autoMode)alert("Välj Hero-korten först.");return}
+  if(!state.heroCards.every(Boolean)){
+    if(!autoMode)alert("Välj Hero-korten först.");
+    return;
+  }
+
   const r=rangeNow();
   if(!r.combos.length){
-    if(autoMode){
-      autoAnalysisRunning=false;
-      showAutoError("INSUFFICIENT DATA","No valid opponent combos.");
-    }
+    autoAnalysisRunning=false;
+    if(autoMode)showAutoError("INSUFFICIENT DATA","No valid opponent combos.");
     return;
   }
 
   const btn=document.getElementById("runEquityBtn");
-  if(btn&&!autoMode){btn.disabled=true;btn.textContent="Calculating..."}
+  if(btn&&!autoMode){
+    btn.disabled=true;
+    btn.textContent="Calculating...";
+  }
 
   const token=++autoAnalysisToken;
   autoAnalysisRunning=autoMode;
 
   if(autoAnalysisTimeout)clearTimeout(autoAnalysisTimeout);
-  if(autoMode){
-    autoAnalysisTimeout=setTimeout(()=>{
-      if(autoAnalysisRunning && token===autoAnalysisToken){
-        autoAnalysisRunning=false;
-        showAutoError("ANALYSIS ERROR","Calculation took too long.");
-      }
-    },2500);
+
+  const targetRuns=autoMode?800:5000;
+  const batchSize=autoMode?40:80;
+  const startTime=performance.now();
+  const softLimitMs=autoMode?1400:5000;
+
+  let w=0,t=0,l=0,done=0;
+  const kb=state.board.filter(Boolean).map(copy);
+  const base=new Set([...state.heroCards,...kb].map(code));
+
+  function finishEstimate(partial=false){
+    if(token!==autoAnalysisToken)return;
+
+    const N=Math.max(1,done);
+    lastEq={
+      win:w/N,
+      tie:t/N,
+      lose:l/N,
+      equity:(w+t*.5)/N,
+      runs:N,
+      partial
+    };
+
+    autoAnalysisRunning=false;
+
+    if(autoAnalysisTimeout){
+      clearTimeout(autoAnalysisTimeout);
+      autoAnalysisTimeout=null;
+    }
+
+    renderEq();
+
+    if(btn&&!autoMode){
+      btn.disabled=false;
+      btn.textContent="Calculate equity";
+    }
+
+    renderAutoDecision();
+
+    const sub=document.getElementById("heroTurnSub");
+    if(autoMode && sub){
+      sub.textContent=partial
+        ? `Quick estimate · ${N} sims`
+        : `Decision ready · ${N} sims`;
+    }
   }
 
-  setTimeout(()=>{
+  function processBatch(){
+    if(token!==autoAnalysisToken)return;
+
     try{
-      let w=0,t=0,l=0;
-      const N=autoMode?3000:10000;
-      const kb=state.board.filter(Boolean).map(copy);
-      const base=new Set([...state.heroCards,...kb].map(code));
+      const batchEnd=Math.min(done+batchSize,targetRuns);
 
-      for(let n=0;n<N;n++){
-        if(token!==autoAnalysisToken)return;
+      while(done<batchEnd){
         const vh=r.combos[Math.floor(Math.random()*r.combos.length)];
-        if(!vh || vh.some(c=>base.has(code(c)))){n--;continue}
-        const dead=new Set([...base,...vh.map(code)]);
-        const d=shuf(FULLDECK.filter(c=>!dead.has(code(c))).map(copy));
-        const bd=kb.slice();
-        while(bd.length<5 && d.length)bd.push(d.pop());
-        if(bd.length<5){n--;continue}
 
-        const q=cmp(best([...state.heroCards,...bd]),best([...vh,...bd]));
+        if(!vh || vh.some(c=>base.has(code(c)))){
+          continue;
+        }
+
+        const dead=new Set([...base,...vh.map(code)]);
+        const deck=FULLDECK.filter(c=>!dead.has(code(c))).map(copy);
+
+        // Partial Fisher-Yates: only shuffle enough cards to complete board.
+        const need=5-kb.length;
+        for(let i=0;i<need;i++){
+          const j=i+Math.floor(Math.random()*(deck.length-i));
+          [deck[i],deck[j]]=[deck[j],deck[i]];
+        }
+
+        const bd=kb.slice();
+        for(let i=0;i<need;i++)bd.push(deck[i]);
+
+        const q=cmp(
+          best([...state.heroCards,...bd]),
+          best([...vh,...bd])
+        );
+
         if(q>0)w++;
         else if(q===0)t++;
         else l++;
+
+        done++;
       }
 
-      if(token!==autoAnalysisToken)return;
-      lastEq={win:w/N,tie:t/N,lose:l/N,equity:(w+t*.5)/N};
-      autoAnalysisRunning=false;
-      if(autoAnalysisTimeout){clearTimeout(autoAnalysisTimeout);autoAnalysisTimeout=null}
-      renderEq();
-      if(btn&&!autoMode){btn.disabled=false;btn.textContent="Calculate equity"}
-      renderAutoDecision();
+      const elapsed=performance.now()-startTime;
+
+      if(done>=targetRuns){
+        finishEstimate(false);
+        return;
+      }
+
+      // In auto mode, return a usable quick estimate instead of hanging.
+      if(autoMode && elapsed>=softLimitMs && done>=200){
+        finishEstimate(true);
+        return;
+      }
+
+      // Yield to browser so UI, timeout, buttons and repaint keep working.
+      setTimeout(processBatch,0);
+
     }catch(err){
       console.error(err);
       autoAnalysisRunning=false;
-      if(autoAnalysisTimeout){clearTimeout(autoAnalysisTimeout);autoAnalysisTimeout=null}
-      if(btn&&!autoMode){btn.disabled=false;btn.textContent="Calculate equity"}
-      if(autoMode)showAutoError("ANALYSIS ERROR","Unable to calculate this state.");
+
+      if(autoAnalysisTimeout){
+        clearTimeout(autoAnalysisTimeout);
+        autoAnalysisTimeout=null;
+      }
+
+      if(done>=100){
+        finishEstimate(true);
+      }else if(autoMode){
+        showAutoError("ANALYSIS ERROR","Unable to calculate this state.");
+      }
+
+      if(btn&&!autoMode){
+        btn.disabled=false;
+        btn.textContent="Calculate equity";
+      }
     }
-  },0)
+  }
+
+  if(autoMode){
+    autoAnalysisTimeout=setTimeout(()=>{
+      if(token!==autoAnalysisToken || !autoAnalysisRunning)return;
+
+      if(done>=100){
+        finishEstimate(true);
+      }else{
+        autoAnalysisRunning=false;
+        showAutoError("ANALYSIS ERROR","Calculation timed out.");
+      }
+    },2200);
+  }
+
+  setTimeout(processBatch,0);
 }
 
-function renderEq(){if(!lastEq)return;document.getElementById("eqWin").textContent=pct(lastEq.win);document.getElementById("eqTie").textContent=pct(lastEq.tie);document.getElementById("eqLose").textContent=pct(lastEq.lose);document.getElementById("eqTotal").textContent=pct(lastEq.equity);document.getElementById("equityExplanation").innerHTML=`Hero equity vs selected estimated range: <strong class="math-highlight">${pct(lastEq.equity)}</strong>. Blocked combos are removed.`;renderEv()}
+function renderEq(){if(!lastEq)return;document.getElementById("eqWin").textContent=pct(lastEq.win);document.getElementById("eqTie").textContent=pct(lastEq.tie);document.getElementById("eqLose").textContent=pct(lastEq.lose);document.getElementById("eqTotal").textContent=pct(lastEq.equity);document.getElementById("equityExplanation").innerHTML=`Hero equity vs selected estimated range: <strong class="math-highlight">${pct(lastEq.equity)}</strong>. Blocked combos are removed. ${lastEq.runs?`Based on ${lastEq.runs} simulations${lastEq.partial?" (quick estimate)":""}.`:""}`;renderEv()}
 function renderEv(){if(!lastEq)return;const eq=lastEq.equity,call=heroIsActing()?amountToCallFor(0):0,pot=state.pot,evCall=call>0?eq*(pot+call)-call:0,fp=+document.getElementById("foldSlider").value/100,frac=+document.getElementById("raiseSizeSelect").value,cost=Math.min(state.players[0].stack,pot*frac),calledPot=pot+2*cost,evCalled=eq*calledPot-cost,evRaise=fp*pot+(1-fp)*evCalled;document.getElementById("evCall").textContent=`${evCall.toFixed(2)} BB`;document.getElementById("evRaise").textContent=`${evRaise.toFixed(2)} BB`;const v=[["FOLD",0],["CALL",evCall],["RAISE",evRaise]].sort((a,b)=>b[1]-a[1]),gap=v[0][1]-v[1][1],s=gap>=2?"CLEAR":gap>=.5?"MODERATE":"CLOSE";document.getElementById("recommendation").innerHTML=`BEST: <span class="math-highlight">${v[0][0]}</span> · EV ${v[0][1].toFixed(2)} BB · ${s}`;renderAutoDecision()}
 
 function autoSignature(){

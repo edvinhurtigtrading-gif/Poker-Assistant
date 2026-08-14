@@ -1,13 +1,15 @@
-# Poker Assistant v0.4.2
+# Poker Assistant v0.4.3
 
-Fixes Auto Decision Mode.
+Fix for Auto Decision Mode hanging on ANALYZING.
 
-## Improvements
-- Auto analysis uses 3,000 Monte Carlo runs for faster decisions.
-- Manual Calculate Equity still uses 10,000 runs.
-- Added a 2.5 second analysis timeout.
-- Added ANALYSIS ERROR / INSUFFICIENT DATA fallback.
-- Prevented stale auto-analysis state from getting stuck on ANALYZING.
-- Added validation around empty ranges and incomplete simulation states.
+## What changed
+- Monte Carlo now runs in small asynchronous batches.
+- The browser gets control back between batches, so the UI never freezes.
+- Auto mode targets 800 simulations for fast decisions.
+- Manual equity targets 5,000 simulations.
+- Auto mode returns a quick partial estimate if the full run takes too long.
+- Timeout can now actually execute because the browser event loop is not blocked.
+- Partial deck shuffle is used for better speed.
+- The decision panel displays how many simulations were used.
 
-The EV/range model is still simplified and not GTO.
+This is still an estimated range/EV model, not a GTO solver.
